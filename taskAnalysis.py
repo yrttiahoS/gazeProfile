@@ -5,7 +5,7 @@ import seaborn as sns
 plotStyle()
 
 #read control group files for both tasks
-controlSRTS, controlSRTA = readFile(controlData, 'SRT') #filenames of preprocessed _CONTROL_ SRT-data
+controlSRTS, controlSRTA = readFile("controlData", 'SRT') #filenames of preprocessed _CONTROL_ SRT-data
 controlFaceS, controlFaceA = readFile(['disengagement_tbt_face_korj_vanha.csv', 'disengagement_tbt_face_korj_uusi.csv'], 'Face') #filenames of preprocessed _CONTROL_ Face-data
 
 #combine SRT and Face task datas into one

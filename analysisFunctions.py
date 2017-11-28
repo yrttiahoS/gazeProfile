@@ -7,8 +7,9 @@ import lmfit
 import math
 from lmfit.models import QuadraticModel
 from os import listdir
+from os.path import isfile, join
 
-#just so the plots look the same on each run
+#Just so the plots look the same on each run
 def plotStyle():
     plt.style.use(['default', 'seaborn-ticks'])
     fig_size = plt.rcParams["figure.figsize"]
@@ -19,7 +20,8 @@ def plotStyle():
 def readFile(dataFolder, type):
     # READ THE DATA
     df = pd.DataFrame()
-    for filename in filenameList:
+    files = [f for f in listdir(dataFolder) if isfile(join(dataFolder, f))]
+    for filename in files:
         df = df.append(pd.read_csv(filename), ignore_index=True) #add new file to end of dataframe
     df[df < 0] = np.nan  # -1 values to nan
 
