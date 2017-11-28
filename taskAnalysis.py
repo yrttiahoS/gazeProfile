@@ -5,11 +5,12 @@ import seaborn as sns
 plotStyle()
 
 #read control group files for both tasks
-sS, sA = readFile(['disengagement_tbt_srt_1.csv','disengagement_tbt_srt_2.csv'], 'SRT') #filenames of preprocessed _CONTROL_ SRT-data
-fS, fA = readFile(['disengagement_tbt_face_korj_vanha.csv', 'disengagement_tbt_face_korj_uusi.csv'], 'Face')
+controlSRTS, controlSRTA = readFile(controlData, 'SRT') #filenames of preprocessed _CONTROL_ SRT-data
+controlFaceS, controlFaceA = readFile(['disengagement_tbt_face_korj_vanha.csv', 'disengagement_tbt_face_korj_uusi.csv'], 'Face') #filenames of preprocessed _CONTROL_ Face-data
 
+#combine SRT and Face task datas into one
 datas = pd.merge(sS, fS, on='subject', how="right")
-datas = datas[(datas.subject != 'TV33') & (datas.subject != 'TV59') & (datas.missing.notnull())] #TV33's data is not valid, TV59 was born prematurely
+datas = datas[(datas.subject != 'TV33') & (datas.subject != 'TV59') & (datas.missing.notnull())]
 print("Verrokkien n = " + str(len(datas)))
 
 #getStd(sA, datas) #get SRT standard deviations

@@ -6,6 +6,7 @@ import seaborn as sns
 import lmfit
 import math
 from lmfit.models import QuadraticModel
+from os import listdir
 
 #just so the plots look the same on each run
 def plotStyle():
@@ -15,7 +16,7 @@ def plotStyle():
     fig_size[1] = 5
     plt.rcParams["figure.figsize"] = fig_size
 
-def readFile(filenameList, type):
+def readFile(dataFolder, type):
     # READ THE DATA
     df = pd.DataFrame()
     for filename in filenameList:
@@ -39,8 +40,8 @@ def readFile(filenameList, type):
         if type == 'SRT':
             # fill in basic individual trial values
             sdf['srtAll'] = sub.combination  # all reaction times
-            sdf[sdf.srtAll == 1000] = np.nan  # remove values of 1000ms
-            sdf['subject'] = [s] * len(sdf.index)  # add subject number to df
+            sdf[sdf.srtAll == 1000] = np.nan  # remove values of 1000 ms (no gaze shift)
+            sdf['subject'] = [s] * len(sdf.index)  # add subject number to df (a bit clunky but works)
 
             df_all = df_all.append(sdf, ignore_index=True)  # add trial data
 
