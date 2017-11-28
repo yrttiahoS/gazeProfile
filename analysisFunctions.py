@@ -21,8 +21,8 @@ def readFile(dataFolder, type):
     # READ THE DATA
     df = pd.DataFrame()
     files = [f for f in listdir(dataFolder) if isfile(join(dataFolder, f))]
-    for filename in files:
-        df = df.append(pd.read_csv(filename), ignore_index=True) #add new file to end of dataframe
+    for file in files:
+        df = df.append(pd.read_csv((dataFolder + "/" + file)), ignore_index=True) #add new file to end of dataframe
     df[df < 0] = np.nan  # -1 values to nan
 
     # SUBJECT AND TRIAL INFORMATION

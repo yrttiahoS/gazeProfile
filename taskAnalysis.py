@@ -8,8 +8,8 @@ plotStyle()
 controlSRTS, controlSRTA = readFile("controlData", 'SRT') #filenames of preprocessed _CONTROL_ SRT-data
 controlFaceS, controlFaceA = readFile(['disengagement_tbt_face_korj_vanha.csv', 'disengagement_tbt_face_korj_uusi.csv'], 'Face') #filenames of preprocessed _CONTROL_ Face-data
 
-#combine SRT and Face task datas into one
-datas = pd.merge(sS, fS, on='subject', how="right")
+#combine subject SRT and Face task datas into one
+datas = pd.merge(controlSRTS, controlFaceS, on='subject', how="right")
 datas = datas[(datas.subject != 'TV33') & (datas.subject != 'TV59') & (datas.missing.notnull())]
 print("Verrokkien n = " + str(len(datas)))
 
