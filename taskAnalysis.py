@@ -1,10 +1,11 @@
 from analysisFunctions import *
 import seaborn as sns
 
+#make the plots pretty
 plotStyle()
 
-#read files for both tasks
-sS, sA = readFile(['disengagement_tbt_srt_1.csv','disengagement_tbt_srt_2.csv'], 'SRT') #filenames of preprocessed SRT-data
+#read control group files for both tasks
+sS, sA = readFile(['disengagement_tbt_srt_1.csv','disengagement_tbt_srt_2.csv'], 'SRT') #filenames of preprocessed _CONTROL_ SRT-data
 fS, fA = readFile(['disengagement_tbt_face_korj_vanha.csv', 'disengagement_tbt_face_korj_uusi.csv'], 'Face')
 
 datas = pd.merge(sS, fS, on='subject', how="right")

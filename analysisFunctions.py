@@ -7,6 +7,7 @@ import lmfit
 import math
 from lmfit.models import QuadraticModel
 
+#just so the plots look the same on each run
 def plotStyle():
     plt.style.use(['default', 'seaborn-ticks'])
     fig_size = plt.rcParams["figure.figsize"]
@@ -15,7 +16,7 @@ def plotStyle():
     plt.rcParams["figure.figsize"] = fig_size
 
 def readFile(filenameList, type):
-    # READING THE DATA
+    # READ THE DATA
     df = pd.DataFrame()
     for filename in filenameList:
         df = df.append(pd.read_csv(filename), ignore_index=True) #add new file to end of dataframe
@@ -23,8 +24,8 @@ def readFile(filenameList, type):
 
     # SUBJECT AND TRIAL INFORMATION
     sub = df.filename.str.partition("_")[0]
-    df['subject'] = sub  # slicing the subject number from the filename
-    subjects = np.unique(df.subject)  # select unique subjects
+    df['subject'] = sub  # slicing the subject number from the filename (the orig. files need to be named "subNumber_something.gazedata")
+    subjects = np.unique(df.subject)  # select unique subject names/numbers
 
     # OUTPUT
     df_sout = pd.DataFrame()  # all subjects' individual results
