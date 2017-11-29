@@ -1,17 +1,15 @@
 from analysisFunctions import *
-import seaborn as sns
 
-#make the plots pretty
+#Make the plots pretty
 plotStyle()
 
-#read control group files for both tasks
-controlSRTS, controlSRTA = readFile("controlData", 'SRT') #filenames of preprocessed _CONTROL_ SRT-data
-controlFaceS, controlFaceA = readFile(['disengagement_tbt_face_korj_vanha.csv', 'disengagement_tbt_face_korj_uusi.csv'], 'Face') #filenames of preprocessed _CONTROL_ Face-data
+#Read control group files for both tasks, these will be the population against which the individuals will be scored
+controlSRTS, controlSRTA = readFile('controlData', 'SRT') #Preprocessed control group SRT-data
+controlFaceS, controlFaceA = readFile('controlData', 'Face') #Preprocessed control group Face-data
 
-#combine subject SRT and Face task datas into one
+#Combine subject SRT and Face task datas into one subject DataFrame
 datas = pd.merge(controlSRTS, controlFaceS, on='subject', how="right")
-datas = datas[(datas.subject != 'TV33') & (datas.subject != 'TV59') & (datas.missing.notnull())]
-print("Verrokkien n = " + str(len(datas)))
+datas = removeSubjects(datas, ['TV33', 'TV59']) #Removing individual subjects happens with this function (or you can remove them completely from the original csv file)
 
 #getStd(sA, datas) #get SRT standard deviations
 #getCI(sA, datas) #get SRT confidence intervals (KESKEN!!)

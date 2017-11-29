@@ -9,55 +9,57 @@ from lmfit.models import QuadraticModel
 from os import listdir
 from os.path import isfile, join
 
-#Just so the plots look the same on each run
-def plotStyle():
+#### DO NOT CHANGE THESE FUNCTIONS, ONLY THE ANALYSIS FILE ####
+
+# This is just so the plots look the same on each run
+def plot_style():
     plt.style.use(['default', 'seaborn-ticks'])
     fig_size = plt.rcParams["figure.figsize"]
     fig_size[0] = 7
     fig_size[1] = 5
     plt.rcParams["figure.figsize"] = fig_size
 
-def readFile(dataFolder, type):
-    # READ THE DATA
+# Read the data files
+def read_file(datafolder, task_type):
     df = pd.DataFrame()
-    files = [f for f in listdir(dataFolder) if isfile(join(dataFolder, f))]
+    filepath = '/'.join(datafolder, task_type)
+    files = [f for f in listdir(filepath) if isfile(join(filepath, f))] # Lists all files in the directory
     for file in files:
-        df = df.append(pd.read_csv((dataFolder + "/" + file)), ignore_index=True) #add new file to end of dataframe
-    df[df < 0] = np.nan  # -1 values to nan
+        df = df.append(pd.read_csv('/'.join(filepath, file)), ignore_index=True) # Adds each new file to end of dataframe
+    df[df < 0] = np.nan  # Converts -1 (missing) values to nan
 
-    # SUBJECT AND TRIAL INFORMATION
-    sub = df.filename.str.partition("_")[0]
-    df['subject'] = sub  # slicing the subject number from the filename (the orig. files need to be named "subNumber_something.gazedata")
-    subjects = np.unique(df.subject)  # select unique subject names/numbers
+    # Add in subject and trial information
+    df['subject'] = df.filename.str.partition("_")[0]  # Slices the subject number from the filename (the orig. files need to be named "subNumber_something.gazedata")
+    subjects = np.unique(df.subject)  # Selects unique subject names/numbers
 
-    # OUTPUT
-    df_sout = pd.DataFrame()  # all subjects' individual results
-    df_all = pd.DataFrame()  # all trials from all subjects
+    # Output Dataframes
+    group_subject_out = pd.DataFrame()  # Output of all subjects' individual results
+    group_all_out = pd.DataFrame()  # Output of all trials from all subjects
 
     # INDIVIDUAL SUBJECT ANALYSIS
-    for i, s in enumerate(subjects):
-        sdf = pd.DataFrame()  # analysis df
-        sub = df[(df.subject == s)]  # one subject's results
+    for i, s in enumerate(subjects): # Loops through each subject separately
+        sdf = pd.DataFrame()  # Subject analysis DataFrame
+        sub = df[(df.subject == s)]  # The current subject's data
 
-        if type == 'SRT':
-            # fill in basic individual trial values
-            sdf['srtAll'] = sub.combination  # all reaction times
-            sdf[sdf.srtAll == 1000] = np.nan  # remove values of 1000 ms (no gaze shift)
-            sdf['subject'] = [s] * len(sdf.index)  # add subject number to df (a bit clunky but works)
+        if task_type == 'SRT':
+            # Fill in basic individual SRT trial values
+            sdf['srt_all'] = sub.combination  # All the subject's reaction times
+            sdf[sdf.srt_all == 1000] = np.nan  # Removes values of 1000 ms (no gaze shift --> nonvalid SRT)
+            sdf['subject'] = [s] * len(sdf.index)  # Adds subject number to the df (a bit clunky but works)
 
-            df_all = df_all.append(sdf, ignore_index=True)  # add trial data
+            group_all_out = df_all_out.append(sdf, ignore_index=True)  # Adds subject's trial-by-trial data to group df
 
-            # combined data values
-            sdf['missing'] = sdf.srtAll.isnull().sum()  # amount of missing values
-            sdf['SRTmed'] = sdf.srtAll.median()  # subject median of all RTs
+            # Combined data values
+            sdf['missing'] = sdf.srt_all.isnull().sum()  # Counts amount of missing values
+            sdf['srt_med'] = sdf.srt_all.median()  # Subject median of all trials
 
-            sdf.drop(['srtAll', 'trial'], axis=1, inplace=True, errors='ignore')  # drop trial data
-            sout = pd.DataFrame(sdf.iloc[0]).T  # get only first row, since all values are the same
-            df_sout = df_sout.append(sout, ignore_index=True)  # add row to subject data frame
+            sdf.drop(['srt_all', 'trial'], axis=1, inplace=True, errors='ignore')  # Drop trial-by-trial data
+            subject_out = pd.DataFrame(sdf.iloc[0]).T  # Gets only first row, since all remaining values are the same
+            group_subject_out = group_subject_out.append(subject_out, ignore_index=True)  # Adds row to subject data frame
 
             df_sout['srtZ'] = st.zscore(df_sout.SRTmed)  # zscores of subject means of all trials
 
-        if type == 'Face':
+        if task_type == 'Face':
             ctrl = sub[(sub.condition == 'control.bmp')]  # all control stimuli trials
             ntrl = sub[(sub.condition == 'neutral.bmp')]  # all neutral
             happ = sub[(sub.condition == 'happy.bmp')]  # all happy
@@ -242,7 +244,7 @@ def getStd(sA, datas):
 def getCI(sA, datas):
     return "this is unfinished"
 
-def pfixDeltas(datas):
+def pfixDeltas(datas): #datas = a pandas dataframe
     #stimulus pifferences
     datas['cvsn'] = datas.pfix_c - datas.pfix_n
     datas['cvsh'] = datas.pfix_c - datas.pfix_h
@@ -538,3 +540,8 @@ def printAllProfiles(datas):
         plt.yticks(range(11), ['H vs F', "EMOTION", "N vs F", "N vs H", "FACE", "C vs F", "C vs H", "C vs N", "SRT 90p", "SRT best", "SRT med"])
         plt.savefig("".join((r.subject, "_profile.png")))
         plt.show()
+
+def removeSubjects(datas, subjectList):
+    for s in subjectList:
+        datas = datas[datas.subject != s]
+    return datas;
