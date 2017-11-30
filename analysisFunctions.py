@@ -19,7 +19,17 @@ def plot_style():
     plt.rcParams["figure.figsize"] = fig_size
 
 
-def add_all_files(dir, subdir):
+def get_control_data(data_dir):
+    control_srt_subjects, control_srt_trials = get_control_data(data_dir, 'SRT')
+    control_face_subjects, control_face_trials = get_control_data(data_dir, 'Face')
+
+    control_data = pd.merge(control_srt_subjects, control_face_subjects, on='subject', how="right")
+    #control_data_trials = pd.merge(control_srt_trials, control_face_trials, on='subject', how="right") # Currently not needed
+
+    return control_data #, control_data_trials
+
+
+def add_all_files(data_dir, subdir):
     df = pd.DataFrame()
     filepath = '/'.join(dir, subdir)
     for file in [f for f in listdir(filepath) if isfile(join(filepath, file))]:
@@ -28,7 +38,7 @@ def add_all_files(dir, subdir):
     return df
 
 
-def get_controls(datafolder, task_type):
+def get_control_data(datafolder, task_type):
     data = add_all_files(datafolder, task_type)
 
     data['subject'] = df.filename.str.partition("_")[0]
@@ -52,7 +62,7 @@ def analysis_files(df):
 def srt_analysis(df):
     group_trials, group_subjects, subject_list = analysis_files(df)
 
-    for i, subject in enumerate(subject_list):
+    for index, subject in enumerate(subject_list):
         subject_data = pd.DataFrame()
         sub = df[(df.subject == subject)]
 
@@ -81,41 +91,40 @@ def face_analysis(df):
         subject_data = pd.DataFrame()
         sub = df[(df.subject == subject)]
 
-        if task_type == 'Face':
-            ctrl, ntrl, happ, fear = get_stimulitypes(sub)
+        subject_data['subject'] = [subject] * len(subject_data.index)
+        subject_data['stimulus'] = df.condition.str[:-4]
 
-            stimulus_list, filter_list, pfix_list, success_list, shown_list = get_stimuli_lists()
+        stimuli = get_stimulustypes(sub)
+        filter_list, pfix_list, success_list, shown_list, success_percentage_list, miss_list = get_stimuli_lists()
 
-            for i, f in enumerate(stimuli):
-                subject_data[filter_list[i]] = stimulus_list[i].csaccpindex
-                subject_data[pfix_list[i]] = subject_data[filter_list[i]].dropna().mean()
-                subject_data[success_list[i]] = stimulus_list[i][stimulus_list[i]['technical error'] == 0]['technical error'].count()
-                subject_data[shown_list[i]] = stimulus_list[i]['technical error'].count()
+        for i, f in enumerate(stimuli):
+            subject_data[filter_list[i]] = stimuli[i].csaccpindex
+            subject_data[pfix_list[i]] = subject_data[filter_list[i]].dropna().mean()
+            subject_data[success_list[i]] = stimuli[i][stimuli[i]['technical error'] == 0]['technical error'].count()
+            subject_data[shown_list[i]] = stimuli[i]['technical error'].count()
+            subject_data[success_percentage_list[i]] = subject_data[success_list[i]] / subject_data[shown_list[i]]
+            subject_data[miss_list[i]] = subject_data[shown_list[i]] / sdf[success_list[i]]
 
-            # Percentages of technically successful trials per stimulus
-            ids = ['all', 'c', 'n', 'h', 'f'] # Identifiers for the variable names
-            for i,f in enumerate(ids):
-                sdf["_".join(["success_percentage", f])] = sdf["_".join(["success", f])] / sdf["_".join(["shown", f])]
-                sdf["_".join(["miss", f])] = sdf["_".join(["shown", f])] / sdf["_".join(["success", f])]
-
-            sdf['stimulus'] = df.condition.str[:-4] # Name of stimulus type (without ".bmp")
-            sdf['subject'] = [s] * len(sdf.index)
-
-            all_out = pd.DataFrame(sdf[['subject', 'all', 'stimulus', 'ctrl', 'ntrl', 'happ', 'fear']])  # Select only the individual values
-            df_all = df_all.append(aout, ignore_index=True)
-            sdf.drop(['all', 'ctrl', 'ntrl', 'happ', 'fear', 'stimulus'], axis=1, inplace=True, errors='ignore')  # drop individual trial information
-            sout = pd.DataFrame(sdf.iloc[0]).T  # select only first row, since all values are the same
-            df_sout = df_sout.append(sout, ignore_index=True)  # append the full df
+        group_trials = group_trials.append(subject_data.loc[:,['subject', 'stimulus', 'trial_all', 'trial_control', 'trial_neutral', 'trial_happy', 'trial_fearful']], ignore_index=True)
+        subject_data.drop(['stimulus', 'trial_all', 'trial_control', 'trial_neutral', 'trial_happy', 'trial_fearful'], axis=1, inplace=True, errors='ignore') # this is a bit copy-paste-y, please fix
+        group_subjects = group_subjects.append(subject_data.head(1), ignore_index=True)
 
     return group_subject_out, group_all_out
 
+
 def get_stimuli_lists():
-    stimuli = [sub, ctrl, ntrl, happ, fear]
-    filters = ['all', 'ctrl', 'ntrl', 'happ', 'fear']
-    pfix = ['pfix_all', 'pfix_c', 'pfix_n', 'pfix_h', 'pfix_f'] # Pfix = percentage of fixation, please refer to thesis/article for explanation
-    success = ['success_all', 'success_c', 'success_n', 'success_h', 'success_f']
-    shown = ['shown_all', 'shown_c', 'shown_n', 'shown_n', 'shown_f']
-    return stimuli, filters, pfix, success, shown
+    ids = ['all', 'control', 'neutral', 'happy', 'fearful']
+    filters, pfix, success, shown, success_percentage, miss = ([] for x in range(6))
+
+    for i in ids:
+        filters.append("_".join(['trial', i]))
+        pfix.append("_".join(['pfix', i]))
+        success.append("_".join(['success', i]))
+        shown.append("_".join(['shown', i]))
+        success_percentage.append("_".join(['success_percentage', i]))
+        miss.append("_".join(['miss', i]))
+
+    return stimuli, filters, pfix, success, shown, success_percentage, miss
 
 # #KORJAA!!!
 # def readToibFile(filenameList, type):
@@ -583,10 +592,10 @@ def removeSubjects(datas, subjectList):
     return datas
 
 
-def get_stimulitypes(sub):
+def get_stimulustypes(sub):
     control = sub[(sub.condition == 'control.bmp')]
     neutral = sub[(sub.condition == 'neutral.bmp')]
     happy = sub[(sub.condition == 'happy.bmp')]
     fearful = sub[(sub.condition == 'fearful.bmp')]
 
-    return control, neutral, happy, fearful
+    return [control, neutral, happy, fearful]

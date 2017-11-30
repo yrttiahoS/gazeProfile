@@ -2,16 +2,9 @@ from analysisFunctions import *
 
 plotStyle()
 
-#Read control group files for both tasks, these will be the population against which the individuals will be scored
-#Never change these, only the files in the controlData folder, if needed
-control_srt_s, control_srt_a = get_controls('controlData', 'SRT')
-control_face_s, control_face_a = get_controls('controlData', 'Face')
+control_data = get_control_data('controlData')
 
-#NOTE: readFile should only be used to read in the control GROUP data, not individual subjects we want to compare to controls!
-
-#Combine subject SRT and Face task datas into one subject DataFrame
-datas = pd.merge(controlSRTS, controlFaceS, on='subject', how="right")
-datas = removeSubjects(datas, ['TV33', 'TV59']) #Removing individual subjects happens with this function (or you can remove them completely from the original csv file)
+control_data = removeSubjects(control_data, ['TV33', 'TV59'])
 
 #getStd(sA, datas) #get SRT standard deviations
 #getCI(sA, datas) #get SRT confidence intervals (KESKEN!!)
