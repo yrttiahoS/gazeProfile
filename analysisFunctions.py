@@ -11,7 +11,6 @@ from os.path import isfile, join
 
 #### DO NOT CHANGE THESE FUNCTIONS, ONLY THE ANALYSIS FILE ####
 
-# This is just so the plots look the same on each run
 def plot_style():
     plt.style.use(['default', 'seaborn-ticks'])
     fig_size = plt.rcParams["figure.figsize"]
@@ -19,205 +18,229 @@ def plot_style():
     fig_size[1] = 5
     plt.rcParams["figure.figsize"] = fig_size
 
-# Read the data files
-def read_file(datafolder, task_type):
+
+def add_all_files(dir, subdir):
     df = pd.DataFrame()
-    filepath = '/'.join(datafolder, task_type)
-    files = [f for f in listdir(filepath) if isfile(join(filepath, f))] # Lists all files in the directory
-    for file in files:
-        df = df.append(pd.read_csv('/'.join(filepath, file)), ignore_index=True) # Adds each new file to end of dataframe
-    df[df < 0] = np.nan  # Converts -1 (missing) values to nan
+    filepath = '/'.join(dir, subdir)
+    for file in [f for f in listdir(filepath) if isfile(join(filepath, file))]:
+        df = df.append(pd.read_csv('/'.join(filepath, file)), ignore_index=True)
+    df[df < 0] = np.nan # nan is better than -1
+    return df
 
-    # Add in subject and trial information
-    df['subject'] = df.filename.str.partition("_")[0]  # Slices the subject number from the filename (the orig. files need to be named "subNumber_something.gazedata")
-    subjects = np.unique(df.subject)  # Selects unique subject names/numbers
 
-    # Output Dataframes
-    group_subject_out = pd.DataFrame()  # Output of all subjects' individual results
-    group_all_out = pd.DataFrame()  # Output of all trials from all subjects
+def get_controls(datafolder, task_type):
+    data = add_all_files(datafolder, task_type)
 
-    # INDIVIDUAL SUBJECT ANALYSIS
-    for i, s in enumerate(subjects): # Loops through each subject separately
-        sdf = pd.DataFrame()  # Subject analysis DataFrame
-        sub = df[(df.subject == s)]  # The current subject's data
+    data['subject'] = df.filename.str.partition("_")[0]
 
-        if task_type == 'SRT':
-            # Fill in basic individual SRT trial values
-            sdf['srt_all'] = sub.combination  # All the subject's reaction times
-            sdf[sdf.srt_all == 1000] = np.nan  # Removes values of 1000 ms (no gaze shift --> nonvalid SRT)
-            sdf['subject'] = [s] * len(sdf.index)  # Adds subject number to the df (a bit clunky but works)
+    if task_type == 'SRT':
+        group_trials, group_subjects = srt_analysis(data)
+    elif task_type == 'Face':   
+        group_trials, group_subjects = face_analysis(data)
 
-            group_all_out = df_all_out.append(sdf, ignore_index=True)  # Adds subject's trial-by-trial data to group df
+    return group_subjects, group_trials
 
-            # Combined data values
-            sdf['missing'] = sdf.srt_all.isnull().sum()  # Counts amount of missing values
-            sdf['srt_med'] = sdf.srt_all.median()  # Subject median of all trials
 
-            sdf.drop(['srt_all', 'trial'], axis=1, inplace=True, errors='ignore')  # Drop trial-by-trial data
-            subject_out = pd.DataFrame(sdf.iloc[0]).T  # Gets only first row, since all remaining values are the same
-            group_subject_out = group_subject_out.append(subject_out, ignore_index=True)  # Adds row to subject data frame
+def analysis_files(df):
+    group_trials = pd.DataFrame()
+    group_subjects = pd.DataFrame()
+    subject_list = np.unique(df.subject)
 
-            df_sout['srtZ'] = st.zscore(df_sout.SRTmed)  # zscores of subject means of all trials
+    return group_trials, group_subjects, subject_list
+
+
+def srt_analysis(df):
+    group_trials, group_subjects, subject_list = analysis_files(df)
+
+    for i, subject in enumerate(subject_list):
+        subject_data = pd.DataFrame()
+        sub = df[(df.subject == subject)]
+
+        subject_data['subject'] = [subject] * len(subject_data.index)
+        subject_data['trial'] = sub.trialnumber ## CHECK IF CORRECT
+        subject_data['srt'] = sub.combination
+        subject_data[subject_data.srt == 1000] = np.nan # reaction times of 1000 ms are not valid (no gaze shift) --> remove
+
+        group_trials = group_trials.append(subject_data, ignore_index=True)
+
+        subject_data['missing'] = subject_data.srt.isnull().sum()
+        subject_data['srt_median'] = subject_data.srt.median()
+
+        subject_data.drop(['srt', 'trial'], axis=1, inplace=True, errors='ignore')
+        group_subjects = group_subjects.append(subject_data.head(1), ignore_index=True)
+
+    group_subjects['srt_zscore'] = st.zscore(group_subjects.srt_med)
+
+    return group_trials, group_subjects
+
+
+def face_analysis(df):
+    group_trials, group_subjects, subjects = analysis_files(df)
+
+    for index, subject in enumerate(subjects):
+        subject_data = pd.DataFrame()
+        sub = df[(df.subject == subject)]
 
         if task_type == 'Face':
-            ctrl = sub[(sub.condition == 'control.bmp')]  # all control stimuli trials
-            ntrl = sub[(sub.condition == 'neutral.bmp')]  # all neutral
-            happ = sub[(sub.condition == 'happy.bmp')]  # all happy
-            fear = sub[(sub.condition == 'fearful.bmp')]  # all fearful
+            ctrl, ntrl, happ, fear = get_stimulitypes(sub)
 
-            stimus = [sub, ctrl, ntrl, happ, fear]
-            filts = ['all', 'ctrl', 'ntrl', 'happ', 'fear']
-            pfix_list = ['pfix', 'pfix_c', 'pfix_n', 'pfix_h', 'pfix_f']
-            succ = ['succ_lkm_all', 'succ_lkm_c', 'succ_lkm_n', 'succ_lkm_h', 'succ_lkm_f']  # number of technically successful trials
-            shown = ['all_shown_lkm', 'c_shown_lkm', 'n_shown_lkm', 'h_shown_lkm', 'f_shown_lkm']
+            stimulus_list, filter_list, pfix_list, success_list, shown_list = get_stimuli_lists()
 
-            # add all necessary values to dataframe with one loop
-            for i, f in enumerate(stimus):
-                sdf[filts[i]] = stimus[i].csaccpindex  # all pfix values, including NaN-values by stimulus type
-                sdf[pfix_list[i]] = sdf[filts[i]].dropna().mean()  # mean of non-NaN values by stimulus type
-                sdf[succ[i]] = stimus[i][stimus[i]['technical error'] == 0]['technical error'].count()  # count of technically successful trials
-                sdf[shown[i]] = stimus[i]['technical error'].count()
+            for i, f in enumerate(stimuli):
+                subject_data[filter_list[i]] = stimulus_list[i].csaccpindex
+                subject_data[pfix_list[i]] = subject_data[filter_list[i]].dropna().mean()
+                subject_data[success_list[i]] = stimulus_list[i][stimulus_list[i]['technical error'] == 0]['technical error'].count()
+                subject_data[shown_list[i]] = stimulus_list[i]['technical error'].count()
 
-            # percentages of technically successful trials per stimulus
-            ids = ['all', 'c', 'n', 'h', 'f']
+            # Percentages of technically successful trials per stimulus
+            ids = ['all', 'c', 'n', 'h', 'f'] # Identifiers for the variable names
             for i,f in enumerate(ids):
-                sdf["_".join([f, "succp"])] = sdf["_".join(["succ_lkm",f])] / sdf["_".join([f,"shown_lkm"])]
-                sdf["_".join([f, "miss"])] = sdf["_".join([f, "shown_lkm"])] / sdf["_".join(["succ_lkm", f])]
+                sdf["_".join(["success_percentage", f])] = sdf["_".join(["success", f])] / sdf["_".join(["shown", f])]
+                sdf["_".join(["miss", f])] = sdf["_".join(["shown", f])] / sdf["_".join(["success", f])]
 
-            sdf['stimulus'] = df.condition.str[:-4]
+            sdf['stimulus'] = df.condition.str[:-4] # Name of stimulus type (without ".bmp")
             sdf['subject'] = [s] * len(sdf.index)
 
-            aout = pd.DataFrame(sdf[['subject', 'all', 'stimulus', 'ctrl', 'ntrl', 'happ', 'fear']])  # select only the individual values
+            all_out = pd.DataFrame(sdf[['subject', 'all', 'stimulus', 'ctrl', 'ntrl', 'happ', 'fear']])  # Select only the individual values
             df_all = df_all.append(aout, ignore_index=True)
             sdf.drop(['all', 'ctrl', 'ntrl', 'happ', 'fear', 'stimulus'], axis=1, inplace=True, errors='ignore')  # drop individual trial information
             sout = pd.DataFrame(sdf.iloc[0]).T  # select only first row, since all values are the same
             df_sout = df_sout.append(sout, ignore_index=True)  # append the full df
 
-    return df_sout, df_all
+    return group_subject_out, group_all_out
 
-#KORJAA!!!
-def readToibFile(filenameList, type):
-    if type == 'SRT':
-        dfs = pd.DataFrame()
-        for filename in filenameList:
-            dfs = dfs.append(pd.read_csv(filename), ignore_index=True)  # add new file to end of dataframe
-        dfs[dfs < 0] = np.nan  # -1 values to nan
+def get_stimuli_lists():
+    stimuli = [sub, ctrl, ntrl, happ, fear]
+    filters = ['all', 'ctrl', 'ntrl', 'happ', 'fear']
+    pfix = ['pfix_all', 'pfix_c', 'pfix_n', 'pfix_h', 'pfix_f'] # Pfix = percentage of fixation, please refer to thesis/article for explanation
+    success = ['success_all', 'success_c', 'success_n', 'success_h', 'success_f']
+    shown = ['shown_all', 'shown_c', 'shown_n', 'shown_n', 'shown_f']
+    return stimuli, filters, pfix, success, shown
 
-        # SUBJECT AND TRIAL INFORMATION
-        dfs['subject'] = dfs.filename.str[:6]  # slicing the subject number from the filename
-        dfs['experiment'] = dfs.filename.str[10:11]  # experiment number
-        dfs = dfs[(dfs.subject != 'Toib36') & (dfs.subject != 'Toib25')]
-        subjects = np.unique(dfs.subject)  # select unique subjects
-        exps = [1, 2, 3]
+# #KORJAA!!!
+# def readToibFile(filenameList, type):
+#     if type == 'SRT':
+#         dfs = pd.DataFrame()
+#         for filename in filenameList:
+#             dfs = dfs.append(pd.read_csv(filename), ignore_index=True)  # add new file to end of dataframe
+#         dfs[dfs < 0] = np.nan  # -1 values to nan
 
-        # OUTPUT
-        dfs_sout = pd.DataFrame()  # all subjects' individual results
-        dfs_all = pd.DataFrame()  # all trials from all subjects
+#         # SUBJECT AND TRIAL INFORMATION
+#         dfs['subject'] = dfs.filename.str[:6]  # slicing the subject number from the filename
+#         dfs['experiment'] = dfs.filename.str[10:11]  # experiment number
+#         dfs = dfs[(dfs.subject != 'Toib36') & (dfs.subject != 'Toib25')]
+#         subjects = np.unique(dfs.subject)  # select unique subjects
+#         exps = [1, 2, 3]
 
-        # INDIVIDUAL SUBJECT ANALYSIS
-        for i, s in enumerate(subjects):
-            sdfs = pd.DataFrame()  # analysis df
-            sub = dfs[(dfs.subject == s)]  # one subject's results
+#         # OUTPUT
+#         dfs_sout = pd.DataFrame()  # all subjects' individual results
+#         dfs_all = pd.DataFrame()  # all trials from all subjects
 
-            # fill in basic individual trial values
-            sdfs['srtAll'] = sub.combination  # all reaction times
-            sdfs[sdfs.srtAll == 1000] = np.nan  # remove values of 1000ms
-            sdfs['subject'] = [s] * len(sdfs.index)  # add subject number to df
-            sdfs['trial'] = range(36)
+#         # INDIVIDUAL SUBJECT ANALYSIS
+#         for i, s in enumerate(subjects):
+#             sdfs = pd.DataFrame()  # analysis df
+#             sub = dfs[(dfs.subject == s)]  # one subject's results
 
-            dfs_all = dfs_all.append(sdfs, ignore_index=True)  # add trial data
+#             # fill in basic individual trial values
+#             sdfs['srtAll'] = sub.combination  # all reaction times
+#             sdfs[sdfs.srtAll == 1000] = np.nan  # remove values of 1000ms
+#             sdfs['subject'] = [s] * len(sdfs.index)  # add subject number to df
+#             sdfs['trial'] = range(36)
 
-            # combined data values
-            sdfs['missing'] = sdfs.srtAll.isnull().sum()  # amount of missing values
-            sdfs['SRTmed'] = sdfs.srtAll.median()  # subject mean of all RTs
+#             dfs_all = dfs_all.append(sdfs, ignore_index=True)  # add trial data
 
-            sdfs.drop(['srtAll', 'trial'], axis=1, inplace=True,
-                      errors='ignore')  # drop trial data (if SRTbest used, drop that too)
-            sout = pd.DataFrame(sdfs.iloc[0]).T  # get only first row, since all values are the same
-            dfs_sout = dfs_sout.append(sout, ignore_index=True)  # add row to subject data frame
+#             # combined data values
+#             sdfs['missing'] = sdfs.srtAll.isnull().sum()  # amount of missing values
+#             sdfs['SRTmed'] = sdfs.srtAll.median()  # subject mean of all RTs
 
-        return dfs_sout, dfs_all
+#             sdfs.drop(['srtAll', 'trial'], axis=1, inplace=True,
+#                       errors='ignore')  # drop trial data (if SRTbest used, drop that too)
+#             sout = pd.DataFrame(sdfs.iloc[0]).T  # get only first row, since all values are the same
+#             dfs_sout = dfs_sout.append(sout, ignore_index=True)  # add row to subject data frame
 
-    if type == 'Face':
-        dff1 = pd.read_csv('dtbt_toibilas_face_25s.csv')
-        dff2 = pd.read_csv('dtbt_toibilas_face_28s.csv')
-        dff3 = pd.read_csv('dtbt_toibilas_face_33s.csv')
-        dff = dff1.append(dff2, ignore_index=True)
-        dff = dff.append(dff3, ignore_index=True)
-        dff[dff < 0] = np.nan  # -1 values to nan
+#         return dfs_sout, dfs_all
 
-        # SUBJECT AND TRIAL INFORMATION
-        dff['subject'] = dff.filename.str[:6]  # slicing the subject number from the filename
-        dff['experiment'] = dff.filename.str[10:11]  # experiment number
-        subjects = np.unique(dff.subject).tolist()  # get unique subjects as list
-        subjects.pop(0)
+    # if type == 'Face':
+    #     dff1 = pd.read_csv('dtbt_toibilas_face_25s.csv')
+    #     dff2 = pd.read_csv('dtbt_toibilas_face_28s.csv')
+    #     dff3 = pd.read_csv('dtbt_toibilas_face_33s.csv')
+    #     dff = dff1.append(dff2, ignore_index=True)
+    #     dff = dff.append(dff3, ignore_index=True)
+    #     dff[dff < 0] = np.nan  # -1 values to nan
 
-        # OUTPUT DATAFRAMES
-        dff_sout = pd.DataFrame()  # mean data for each subject
-        dff_all = pd.DataFrame()  # all individual values for distribution analysis
+    #     # SUBJECT AND TRIAL INFORMATION
+    #     dff['subject'] = dff.filename.str[:6]  # slicing the subject number from the filename
+    #     dff['experiment'] = dff.filename.str[10:11]  # experiment number
+    #     subjects = np.unique(dff.subject).tolist()  # get unique subjects as list
+    #     subjects.pop(0)
 
-        # INDIVIDUAL SUBJECT ANALYSIS
-        for i, s in enumerate(subjects):
-            sdff = pd.DataFrame()  # create new data frame to hold results
+    #     # OUTPUT DATAFRAMES
+    #     dff_sout = pd.DataFrame()  # mean data for each subject
+    #     dff_all = pd.DataFrame()  # all individual values for distribution analysis
 
-            # logical indexing (slicing data by stimulus)
-            sub = dff[(dff.subject == s)]  # all data of one subject
-            ctrl = sub[(sub.condition == 'control.bmp')]  # all control stimuli trials
-            ntrl = sub[(sub.condition == 'neutral.bmp')]  # all neutral
-            happ = sub[(sub.condition == 'happy.bmp')]  # all happy
-            fear = sub[(sub.condition == 'fearful.bmp')]  # all fearful
+    #     # INDIVIDUAL SUBJECT ANALYSIS
+    #     for i, s in enumerate(subjects):
+    #         sdff = pd.DataFrame()  # create new data frame to hold results
 
-            # list all necessary values for easier looping
-            stimus = [sub, ctrl, ntrl, happ, fear]
-            filts = ['all', 'ctrl', 'ntrl', 'happ', 'fear']
-            pfix_list = ['pfix', 'pfix_c', 'pfix_n', 'pfix_h', 'pfix_f']
-            pfix_slist = ['pfix_shift', 'pfix_c_shift', 'pfix_n_shift', 'pfix_h_shift', 'pfix_f_shift']
-            obl = ['obl_all', 'obl_c', 'obl_n', 'obl_h',
-               'obl_f']  # number of trials where the child didn't shift their gaze ("obligatory looking")
-            succ = ['succ_lkm', 'succ_lkm_c', 'succ_lkm_n', 'succ_lkm_h',
-                'succ_lkm_f']  # number of technically successful trials
-            shown = ['all_shown_lkm', 'c_shown_lkm', 'n_shown_lkm', 'h_shown_lkm', 'f_shown_lkm']
-            rts = ['rtime', 'rtime_c', 'rtime_n', 'rtime_h', 'rtime_f']  # reaction times
+    #         # logical indexing (slicing data by stimulus)
+    #         sub = dff[(dff.subject == s)]  # all data of one subject
+    #         ctrl = sub[(sub.condition == 'control.bmp')]  # all control stimuli trials
+    #         ntrl = sub[(sub.condition == 'neutral.bmp')]  # all neutral
+    #         happ = sub[(sub.condition == 'happy.bmp')]  # all happy
+    #         fear = sub[(sub.condition == 'fearful.bmp')]  # all fearful
 
-            # add all necessary values to dataframe with one loop
-            for i, f in enumerate(stimus):
-                sdff[filts[i]] = stimus[i].csaccpindex  # all pfix values, including NaN-values by stimulus type
-                sdff[pfix_list[i]] = sdff[filts[i]].dropna().mean()  # mean of non-NaN values by stimulus type
-                try:  # may cause errors if not enough values --> try/except
-                    sdff[pfix_slist[i]] = sdff[sdff[filts[i]] < 1][
-                    filts[i]].mean()  # mean of pfix values that are less than 1 (meaning there was a gaze shift)
-                except:
-                    sdff[pfix_slist[i]] = np.nan  # if no shifts, put in NaN
-                sdff[obl[i]] = sdff[sdff[filts[i]] == 1][filts[i]].count()  # count of trials where there was no gaze shift
-                sdff[succ[i]] = stimus[i][stimus[i]['technical_error'] == 0][
-                'technical_error'].count()  # count of technically successful trials
-                sdff[shown[i]] = stimus[i]['technical_error'].count()
-                sdff[rts[i]] = stimus[i][
-                stimus[i].combination < 1000].combination  # reaction times that are faster than 1000ms (=no gaze shift)
+    #         # list all necessary values for easier looping
+    #         stimus = [sub, ctrl, ntrl, happ, fear]
+    #         filts = ['all', 'ctrl', 'ntrl', 'happ', 'fear']
+    #         pfix_list = ['pfix', 'pfix_c', 'pfix_n', 'pfix_h', 'pfix_f']
+    #         pfix_slist = ['pfix_shift', 'pfix_c_shift', 'pfix_n_shift', 'pfix_h_shift', 'pfix_f_shift']
+    #         obl = ['obl_all', 'obl_c', 'obl_n', 'obl_h',
+    #            'obl_f']  # number of trials where the child didn't shift their gaze ("obligatory looking")
+    #         succ = ['succ_lkm', 'succ_lkm_c', 'succ_lkm_n', 'succ_lkm_h',
+    #             'succ_lkm_f']  # number of technically successful trials
+    #         shown = ['all_shown_lkm', 'c_shown_lkm', 'n_shown_lkm', 'h_shown_lkm', 'f_shown_lkm']
+    #         rts = ['rtime', 'rtime_c', 'rtime_n', 'rtime_h', 'rtime_f']  # reaction times
 
-            # percentages of technically successful trials per stimulus
-            sdff['all_succp'] = sdff.succ_lkm / sdff.all_shown_lkm
-            sdff['c_succp'] = sdff.succ_lkm_c / sdff.c_shown_lkm
-            sdff['n_succp'] = sdff.succ_lkm_n / sdff.n_shown_lkm
-            sdff['h_succp'] = sdff.succ_lkm_h / sdff.h_shown_lkm
-            sdff['f_succp'] = sdff.succ_lkm_f / sdff.f_shown_lkm
+    #         # add all necessary values to dataframe with one loop
+    #         for i, f in enumerate(stimus):
+    #             sdff[filts[i]] = stimus[i].csaccpindex  # all pfix values, including NaN-values by stimulus type
+    #             sdff[pfix_list[i]] = sdff[filts[i]].dropna().mean()  # mean of non-NaN values by stimulus type
+    #             try:  # may cause errors if not enough values --> try/except
+    #                 sdff[pfix_slist[i]] = sdff[sdff[filts[i]] < 1][
+    #                 filts[i]].mean()  # mean of pfix values that are less than 1 (meaning there was a gaze shift)
+    #             except:
+    #                 sdff[pfix_slist[i]] = np.nan  # if no shifts, put in NaN
+    #             sdff[obl[i]] = sdff[sdff[filts[i]] == 1][filts[i]].count()  # count of trials where there was no gaze shift
+    #             sdff[succ[i]] = stimus[i][stimus[i]['technical_error'] == 0][
+    #             'technical_error'].count()  # count of technically successful trials
+    #             sdff[shown[i]] = stimus[i]['technical_error'].count()
+    #             sdff[rts[i]] = stimus[i][
+    #             stimus[i].combination < 1000].combination  # reaction times that are faster than 1000ms (=no gaze shift)
 
-            sdff['stimulus'] = dff.condition.str[:-4]
-            sdff['subject'] = [s] * len(sdff.index)  # subject details
+    #         # percentages of technically successful trials per stimulus
+    #         sdff['all_succp'] = sdff.succ_lkm / sdff.all_shown_lkm
+    #         sdff['c_succp'] = sdff.succ_lkm_c / sdff.c_shown_lkm
+    #         sdff['n_succp'] = sdff.succ_lkm_n / sdff.n_shown_lkm
+    #         sdff['h_succp'] = sdff.succ_lkm_h / sdff.h_shown_lkm
+    #         sdff['f_succp'] = sdff.succ_lkm_f / sdff.f_shown_lkm
 
-            # separate subject csvs for spss analysis (not necessary?)
-            filu = "".join([s, "_faceresults.csv"])
-            sdff.to_csv(filu, encoding='utf-8')
+    #         sdff['stimulus'] = dff.condition.str[:-4]
+    #         sdff['subject'] = [s] * len(sdff.index)  # subject details
 
-            aout = pd.DataFrame(
-                sdff[['subject', 'all', 'stimulus', 'ctrl', 'ntrl', 'happ', 'fear']])  # select only the individual values
-            dff_all = dff_all.append(aout, ignore_index=True)  # append the
-            sdff.drop(['all', 'ctrl', 'ntrl', 'happ', 'fear', 'stimulus'], axis=1, inplace=True,
-                  errors='ignore')  # drop individual trial information
-            sout = pd.DataFrame(sdff.iloc[0]).T  # select only first row, since all values are the same
-            dff_sout = dff_sout.append(sout, ignore_index=True)  # append the full df
+    #         # separate subject csvs for spss analysis (not necessary?)
+    #         filu = "".join([s, "_faceresults.csv"])
+    #         sdff.to_csv(filu, encoding='utf-8')
 
-        return dff_sout, dff_all
+    #         aout = pd.DataFrame(
+    #             sdff[['subject', 'all', 'stimulus', 'ctrl', 'ntrl', 'happ', 'fear']])  # select only the individual values
+    #         dff_all = dff_all.append(aout, ignore_index=True)  # append the
+    #         sdff.drop(['all', 'ctrl', 'ntrl', 'happ', 'fear', 'stimulus'], axis=1, inplace=True,
+    #               errors='ignore')  # drop individual trial information
+    #         sout = pd.DataFrame(sdff.iloc[0]).T  # select only first row, since all values are the same
+    #         dff_sout = dff_sout.append(sout, ignore_index=True)  # append the full df
+
+    #     return dff_sout, dff_all
+
 
 def getStd(sA, datas):
     sstd = []
@@ -241,10 +264,12 @@ def getStd(sA, datas):
     datas['sqrt_std'] = np.sqrt(datas.srt_std)
     datas['sqrt_std_z'] = sqz
 
+
 def getCI(sA, datas):
     return "this is unfinished"
 
-def pfixDeltas(datas): #datas = a pandas dataframe
+
+def pfixDeltas(datas):
     #stimulus pifferences
     datas['cvsn'] = datas.pfix_c - datas.pfix_n
     datas['cvsh'] = datas.pfix_c - datas.pfix_h
@@ -299,6 +324,7 @@ def pfixDeltas(datas): #datas = a pandas dataframe
     datas['nfc_avg'] = datas[["comb_n", "comb_f"]].mean(axis=1)
     datas['hfc_avg'] = datas[["comb_h", "comb_f"]].mean(axis=1)
 
+
 def wpr(sA, datas):
     sub_list = datas.subject.tolist()
     sub_wpr = []
@@ -309,6 +335,7 @@ def wpr(sA, datas):
 
     datas['wp90'] = sub_wpr
     datas['wp90z'] = st.zscore(sub_wpr)
+
 
 def dataTransform(datas, diff):
     if diff == "cvsna":
@@ -361,6 +388,7 @@ def dataTransform(datas, diff):
         tulos = curvefitting(datas, ka, seli, diff)
 
     return tulos
+
 
 def curvefitting(datas, ka, seli, diff):
     x = []
@@ -432,11 +460,13 @@ def curvefitting(datas, ka, seli, diff):
     return uudet
     #add desc statistics
 
+
 def sqrtTrans(datas, diff):
     uusi = np.sqrt(datas[diff].tolist())
     print("Normality after transform: " + str(st.shapiro(uusi)))
     datas["_".join([diff, "sqrt"])] = uusi
     return uusi
+
 
 def percentiles(datas, diff):
     nolla = np.percentile(datas[diff], 2.5)
@@ -447,6 +477,7 @@ def percentiles(datas, diff):
     viides = np.percentile(datas[diff], 100)
 
     return nolla, eka, toka, kolmas, neljas, viides
+
 
 def percPlots(datas):
     diffs = ["nvsha", "nvsfa", "hvsfa"]
@@ -466,14 +497,17 @@ def percPlots(datas):
             plt.savefig("".join([r.subject, d, "_percentiles.png"]))
             plt.show()
 
+
 def transformAll(datas):
     differences = ["cvsna","cvsha","cvsfa","nvsha","nvsfa","hvsfa","cvsnac","cvshac","cvsfac","nvshac","nvsfac","hvsfac"]
     for d in differences:
         arvot = dataTransform(datas, d)
         datas["_".join([d, "fin_z"])] = st.zscore(arvot)
 
+
 def saveFile(df, filename):
     df.to_csv(filename, encoding='utf-8')
+
 
 def printAllProfiles(datas):
     for i, r in datas.iterrows():
@@ -541,7 +575,18 @@ def printAllProfiles(datas):
         plt.savefig("".join((r.subject, "_profile.png")))
         plt.show()
 
+
 def removeSubjects(datas, subjectList):
     for s in subjectList:
         datas = datas[datas.subject != s]
-    return datas;
+
+    return datas
+
+
+def get_stimulitypes(sub):
+    control = sub[(sub.condition == 'control.bmp')]
+    neutral = sub[(sub.condition == 'neutral.bmp')]
+    happy = sub[(sub.condition == 'happy.bmp')]
+    fearful = sub[(sub.condition == 'fearful.bmp')]
+
+    return control, neutral, happy, fearful

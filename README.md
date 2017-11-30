@@ -10,4 +10,4 @@ Preprocessing was done with Infant Cognition Lab's (University of Tampere) [gaze
 This project is still in development, final version should be out early 2018.
 
 ### Comments
-The functions are very thoroughly commented, which may make the file slightly hard to read and not the prettiest. This commenting style is due to learning from experience that (especially in research) even very thorough external documentation may mysteriously disappear along the way.
+The files are at points VERY overly commented, which is bad coding practice on my part. This commenting style is due to learning from experience that (especially in research) even very thorough external documentation may mysteriously disappear along the way during development. Most comments will be gone very soon.

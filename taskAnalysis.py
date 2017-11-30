@@ -1,11 +1,13 @@
 from analysisFunctions import *
 
-#Make the plots pretty
 plotStyle()
 
 #Read control group files for both tasks, these will be the population against which the individuals will be scored
-controlSRTS, controlSRTA = readFile('controlData', 'SRT') #Preprocessed control group SRT-data
-controlFaceS, controlFaceA = readFile('controlData', 'Face') #Preprocessed control group Face-data
+#Never change these, only the files in the controlData folder, if needed
+control_srt_s, control_srt_a = get_controls('controlData', 'SRT')
+control_face_s, control_face_a = get_controls('controlData', 'Face')
+
+#NOTE: readFile should only be used to read in the control GROUP data, not individual subjects we want to compare to controls!
 
 #Combine subject SRT and Face task datas into one subject DataFrame
 datas = pd.merge(controlSRTS, controlFaceS, on='subject', how="right")
@@ -13,15 +15,6 @@ datas = removeSubjects(datas, ['TV33', 'TV59']) #Removing individual subjects ha
 
 #getStd(sA, datas) #get SRT standard deviations
 #getCI(sA, datas) #get SRT confidence intervals (KESKEN!!)
-
-print(sA)
-srtmedian = np.mean(datas.SRTmed)
-sns.distplot(datas.SRTmed.dropna())
-plt.ylim(0,0.006)
-plt.plot([srtmedian, srtmedian], [0,0.008], 'k--',label="mean " + str(srtmedian) + " ms")
-plt.xlabel("Saccadic Reaction Time (ms)")
-plt.legend()
-plt.show()
 
 #90. percentile for subject SRTs
 wpr(sA, datas)
