@@ -9,7 +9,11 @@ from lmfit.models import QuadraticModel
 from os import listdir
 from os.path import isfile, join
 
-#### DO NOT CHANGE THESE FUNCTIONS, ONLY THE ANALYSIS FILE ####
+##TO DO: modify functions to use df.column.apply(function())?
+
+ids = ['all', 'control', 'neutral', 'happy', 'fearful']
+#id_index_order = [1, 2, 1, 3, 1, 4, 2, 3, 2, 4, 3, 4] # or [1, 1, 1, 2, 2, 3] and [2, 3, 4, 3, 4, 4] --> this will make sense later
+difference_list = ['control_neutral', 'control_happy', 'control_fearful', 'neutral_happy', 'neutral_fearful', 'happy_fearful']
 
 def plot_style():
     plt.style.use(['default', 'seaborn-ticks'])
@@ -31,9 +35,10 @@ def get_control_data(data_dir):
 
 def add_all_files(data_dir, subdir):
     df = pd.DataFrame()
-    filepath = '/'.join(dir, subdir)
-    for file in [f for f in listdir(filepath) if isfile(join(filepath, file))]:
-        df = df.append(pd.read_csv('/'.join(filepath, file)), ignore_index=True)
+    filepath = sjoin(dir, subdir)
+    #needs cleanup
+    for file in [f for f in listdir(filepath) if isfile(sjoin(filepath, file))]:
+        df = df.append(pd.read_csv(sjoin(filepath, file)), ignore_index=True)
     df[df < 0] = np.nan # nan is better than -1
     return df
 
@@ -113,16 +118,15 @@ def face_analysis(df):
 
 
 def get_stimuli_lists():
-    ids = ['all', 'control', 'neutral', 'happy', 'fearful']
     filters, pfix, success, shown, success_percentage, miss = ([] for x in range(6))
 
     for i in ids:
-        filters.append("_".join(['trial', i]))
-        pfix.append("_".join(['pfix', i]))
-        success.append("_".join(['success', i]))
-        shown.append("_".join(['shown', i]))
-        success_percentage.append("_".join(['success_percentage', i]))
-        miss.append("_".join(['miss', i]))
+        filters.append(ujoin('trial', i))
+        pfix.append(ujoin('pfix', i))
+        success.append(ujoin('success', i))
+        shown.append(ujoin('shown', i))
+        success_percentage.append(ujoin('success_percentage', i))
+        miss.append(ujoin('miss', i))
 
     return stimuli, filters, pfix, success, shown, success_percentage, miss
 
@@ -145,11 +149,14 @@ def get_srt_std(group_trials, datas): #rename?
     
     return datas
 
+
 # Unfinished but currently not needed
 #def getCI(group_trials, datas):
     #return "this is unfinished"
 
-def add_basic_differences(datas, difference_list):
+
+def add_differences(datas):
+    # needs cleanup
     datas[difference_list[0]] = datas.pfix_control - datas.pfix_neutral
     datas[difference_list[1]] = datas.pfix_control - datas.pfix_happy
     datas[difference_list[2]] = datas.pfix_control - datas.pfix_fearful
@@ -158,33 +165,9 @@ def add_basic_differences(datas, difference_list):
     datas[difference_list[5]] = datas.pfix_happy - datas.pfix_fearful
 
     for i in range(6):
-        datas['_'.join(difference_list[i], 'absolute')] = abs(datas.difference_list[i])
-
-    return datas
-
-
-def add_two_stimulus_means(datas, difference_list):
-    datas['_'.join(difference_list[0], 'mean')] = datas[["pfix_c", "pfix_n"]].mean(axis=1)
-    datas['_'.join(difference_list[1], 'mean')] = datas[["pfix_c", "pfix_h"]].mean(axis=1)
-    datas['_'.join(difference_list[2], 'mean')] = datas[["pfix_c", "pfix_f"]].mean(axis=1)
-    datas['_'.join(difference_list[3], 'mean')] = datas[["pfix_n", "pfix_h"]].mean(axis=1)
-    datas['_'.join(difference_list[4], 'mean')] = datas[["pfix_n", "pfix_f"]].mean(axis=1)
-    datas['_'.join(difference_list[5], 'mean')] = datas[["pfix_h", "pfix_f"]].mean(axis=1)
-
-
-def pfix_differences(datas):
-    difference_list = ['control_neutral', 'control_happy', 'control_fearful', 'neutral_happy', 'neutral_fearful', 'happy_fearful']
-
-    datas = add_basic_differences(datas, difference_list)
-    datas = add_two_stimulus_means()
-
-    #weighting with success perventage
-    datas['comb_c'] = datas.pfix_c * datas.c_succp
-    datas['comb_n'] = datas.pfix_n * datas.n_succp
-    datas['comb_h'] = datas.pfix_h * datas.h_succp
-    datas['comb_f'] = datas.pfix_f * datas.f_succp
-
-    #difference of weighted values
+        datas[ujoin(difference_list[i], 'absolute')] = abs(datas.difference_list[i])
+    
+    #difference of weighted values --> needs cleanup (like above, combine these into one)
     datas['cvsnc'] = datas.comb_c - datas.comb_n
     datas['cvshc'] = datas.comb_c - datas.comb_h
     datas['cvsfc'] = datas.comb_c - datas.comb_f
@@ -192,7 +175,7 @@ def pfix_differences(datas):
     datas['nvsfc'] = datas.comb_n - datas.comb_f
     datas['hvsfc'] = datas.comb_h - datas.comb_f
 
-    #absolute differences
+    #absolute weighted differences --> needs cleanup
     datas['cvsnac'] = abs(datas.cvsnc)
     datas['cvshac'] = abs(datas.cvshc)
     datas['cvsfac'] = abs(datas.cvsfc)
@@ -200,24 +183,50 @@ def pfix_differences(datas):
     datas['nvsfac'] = abs(datas.nvsfc)
     datas['hvsfac'] = abs(datas.hvsfc)
 
-    #mean of weighted stimuli
-    datas['cnc_avg'] = datas[["comb_c", "comb_n"]].mean(axis=1)
-    datas['chc_avg'] = datas[["comb_c", "comb_h"]].mean(axis=1)
-    datas['cfc_avg'] = datas[["comb_c", "comb_f"]].mean(axis=1)
-    datas['nhc_avg'] = datas[["comb_n", "comb_h"]].mean(axis=1)
-    datas['nfc_avg'] = datas[["comb_n", "comb_f"]].mean(axis=1)
-    datas['hfc_avg'] = datas[["comb_h", "comb_f"]].mean(axis=1)
+    return datas
 
 
-def wpr(sA, datas):
-    sub_list = datas.subject.tolist()
-    sub_wpr = []
+def add_two_stimulus_means(datas):
+    # needs cleanup
+    datas[ujoin(difference_list[0], 'mean')] = datas[["pfix_control", "pfix_neutral"]].mean(axis=1)
+    datas[ujoin(difference_list[1], 'mean')] = datas[["pfix_control", "pfix_happy"]].mean(axis=1)
+    datas[ujoin(difference_list[2], 'mean')] = datas[["pfix_control", "pfix_fearful"]].mean(axis=1)
+    datas[ujoin(difference_list[3], 'mean')] = datas[["pfix_neutral", "pfix_happy"]].mean(axis=1)
+    datas[ujoin(difference_list[4], 'mean')] = datas[["pfix_neutral", "pfix_fearful"]].mean(axis=1)
+    datas[ujoin(difference_list[5], 'mean')] = datas[["pfix_happy", "pfix_fearful"]].mean(axis=1)
+
+    datas['cnc_avg'] = datas[["weighted_control", "weighted_neutral"]].mean(axis=1)
+    datas['chc_avg'] = datas[["weighted_control", "weighted_happy"]].mean(axis=1)
+    datas['cfc_avg'] = datas[["weighted_control", "weighted_fearful"]].mean(axis=1)
+    datas['nhc_avg'] = datas[["weighted_neutral", "weighted_happy"]].mean(axis=1)
+    datas['nfc_avg'] = datas[["weighted_neutral", "weighted_fearful"]].mean(axis=1)
+    datas['hfc_avg'] = datas[["weighted_happy", "weighted_fearful"]].mean(axis=1)
+
+    return datas
+
+
+def weight_with_success_percentage(datas):
+    for i in range(1,5):
+        datas[ujoin('weighted', ids[i])] = datas[ujoin('pfix', ids[i]) * datas[ujoin('success_percentage', ids[i])]
+    return datas
+
+
+def pfix_differences(datas):
+    datas = weight_with_success_percentage(datas)
+    datas = add_differences(datas)
+    datas = add_two_stimulus_means(datas)
+    return datas
+
+
+def worst_performance(sA, datas):
+    subjest_list = datas.subject.tolist()
+    subject_worst_performance = []
 
     for i,s in enumerate(sub_list):
         sub = sA[sA.subject == sub_list[i]]
-        sub_wpr.append(np.percentile(np.sort(sub.srtAll.dropna().tolist()), 90))
+        subject_worst_performance.append(np.percentile(np.sort(sub.srt.dropna().tolist()), 90))
 
-    datas['wp90'] = sub_wpr
+    datas['wp90'] = subject_worst_performance
     datas['wp90z'] = st.zscore(sub_wpr)
 
 
@@ -306,7 +315,7 @@ def curvefitting(datas, ka, seli, diff):
     #plt.title(seli + " " + str(fit_fn))
     #plt.xlabel("Mean " + seli)
     #plt.ylabel("Abs. difference " + seli)
-    #plt.savefig("".join([stimuli, "_reg.png"]))
+    #plt.savefig(ujoin(stimuli, "reg.png"))
     #plt.show()
 
     #quadratic model
@@ -326,7 +335,7 @@ def curvefitting(datas, ka, seli, diff):
     #plt.plot(tasotus, 'bo')
     #plt.title(seli + " residuals")
     #plt.plot([0, 38], [0, 0], 'k--', lw=1)
-    #plt.savefig("".join([stimuli, "_res.png"]))
+    #plt.savefig(ujoin(stimuli, "res.png"))
     #plt.show()
 
     uusijarjestys = []
@@ -338,7 +347,7 @@ def curvefitting(datas, ka, seli, diff):
     uusijarjestys.sort(key=lambda x: x[1])
 
     uudet = [item[0] for item in uusijarjestys]
-    datas["_".join([diff, "resid"])] = uudet
+    datas[ujoin(diff, "resid")] = uudet
     print(result.fit_report(min_correl=0.25))
 
     return uudet
@@ -348,7 +357,7 @@ def curvefitting(datas, ka, seli, diff):
 def sqrtTrans(datas, diff):
     uusi = np.sqrt(datas[diff].tolist())
     print("Normality after transform: " + str(st.shapiro(uusi)))
-    datas["_".join([diff, "sqrt"])] = uusi
+    datas[ujoin(diff, "sqrt")] = uusi
     return uusi
 
 
@@ -378,7 +387,7 @@ def percPlots(datas):
             plt.plot([perc[2], perc[2]],[-0.5,0.5], 'k--')
             plt.axvspan(perc[4], perc[5] + 0.02, color='red', alpha=0.3)
             plt.axis([-0.02,perc[5] + 0.02,-0.5,0.5])
-            plt.savefig("".join([r.subject, d, "_percentiles.png"]))
+            plt.savefig(ujoin(r.subject, d, "percentiles.png"))
             plt.show()
 
 
@@ -386,7 +395,7 @@ def transformAll(datas):
     differences = ["cvsna","cvsha","cvsfa","nvsha","nvsfa","hvsfa","cvsnac","cvshac","cvsfac","nvshac","nvsfac","hvsfac"]
     for d in differences:
         arvot = dataTransform(datas, d)
-        datas["_".join([d, "fin_z"])] = st.zscore(arvot)
+        datas[ujoin(d, "fin_z")] = st.zscore(arvot)
 
 
 def saveFile(df, filename):
@@ -406,7 +415,7 @@ def printAllProfiles(datas):
         plt.ylabel("Pfix", fontsize=10)
         for label in (ax.get_xticklabels() + ax.get_yticklabels()):
             label.set_fontsize(10)
-        plt.savefig("".join((r.subject, "_pfix.png")))
+        plt.savefig(ujoin((r.subject, "pfix.png")))
         plt.legend()
         plt.show()
 
@@ -427,7 +436,7 @@ def printAllProfiles(datas):
         plt.ylabel("Difference", fontsize=10)
         for label in ax.get_yticklabels():
             label.set_fontsize(10)
-        plt.savefig("".join((r.subject, "_diff.png")))
+        plt.savefig(ujoin((r.subject, "diff.png")))
         plt.legend()
         plt.show()
 
@@ -456,7 +465,7 @@ def printAllProfiles(datas):
         plt.title(r.subject + " eye tracking profile")
         #plt.legend()
         plt.yticks(range(11), ['H vs F', "EMOTION", "N vs F", "N vs H", "FACE", "C vs F", "C vs H", "C vs N", "SRT 90p", "SRT best", "SRT med"])
-        plt.savefig("".join((r.subject, "_profile.png")))
+        plt.savefig(ujoin(r.subject, "profile.png"))
         plt.show()
 
 
@@ -474,3 +483,10 @@ def get_stimulustypes(sub):
     fearful = sub[(sub.condition == 'fearful.bmp')]
 
     return [control, neutral, happy, fearful]
+
+
+def ujoin(string1, string2):
+    return '_'.join(string1, string2)
+
+def sjoin(string1, string2):
+    return '/'.join(string1, string2)
