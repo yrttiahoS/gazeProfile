@@ -4,10 +4,10 @@ plotStyle()
 
 control_data = get_control_data('controlData')
 
-control_data = removeSubjects(control_data, ['TV33', 'TV59'])
+control_data = removeSubjects(control_data, ['TV33', 'TV59']) # preterms excluded
 
-#getStd(sA, datas) #get SRT standard deviations
-#getCI(sA, datas) #get SRT confidence intervals (KESKEN!!)
+#getStd(sA, datas)
+#getCI(sA, datas)
 
 #90. percentile for subject SRTs
 wpr(sA, datas)

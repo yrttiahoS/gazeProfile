@@ -126,150 +126,20 @@ def get_stimuli_lists():
 
     return stimuli, filters, pfix, success, shown, success_percentage, miss
 
-# #KORJAA!!!
-# def readToibFile(filenameList, type):
-#     if type == 'SRT':
-#         dfs = pd.DataFrame()
-#         for filename in filenameList:
-#             dfs = dfs.append(pd.read_csv(filename), ignore_index=True)  # add new file to end of dataframe
-#         dfs[dfs < 0] = np.nan  # -1 values to nan
 
-#         # SUBJECT AND TRIAL INFORMATION
-#         dfs['subject'] = dfs.filename.str[:6]  # slicing the subject number from the filename
-#         dfs['experiment'] = dfs.filename.str[10:11]  # experiment number
-#         dfs = dfs[(dfs.subject != 'Toib36') & (dfs.subject != 'Toib25')]
-#         subjects = np.unique(dfs.subject)  # select unique subjects
-#         exps = [1, 2, 3]
-
-#         # OUTPUT
-#         dfs_sout = pd.DataFrame()  # all subjects' individual results
-#         dfs_all = pd.DataFrame()  # all trials from all subjects
-
-#         # INDIVIDUAL SUBJECT ANALYSIS
-#         for i, s in enumerate(subjects):
-#             sdfs = pd.DataFrame()  # analysis df
-#             sub = dfs[(dfs.subject == s)]  # one subject's results
-
-#             # fill in basic individual trial values
-#             sdfs['srtAll'] = sub.combination  # all reaction times
-#             sdfs[sdfs.srtAll == 1000] = np.nan  # remove values of 1000ms
-#             sdfs['subject'] = [s] * len(sdfs.index)  # add subject number to df
-#             sdfs['trial'] = range(36)
-
-#             dfs_all = dfs_all.append(sdfs, ignore_index=True)  # add trial data
-
-#             # combined data values
-#             sdfs['missing'] = sdfs.srtAll.isnull().sum()  # amount of missing values
-#             sdfs['SRTmed'] = sdfs.srtAll.median()  # subject mean of all RTs
-
-#             sdfs.drop(['srtAll', 'trial'], axis=1, inplace=True,
-#                       errors='ignore')  # drop trial data (if SRTbest used, drop that too)
-#             sout = pd.DataFrame(sdfs.iloc[0]).T  # get only first row, since all values are the same
-#             dfs_sout = dfs_sout.append(sout, ignore_index=True)  # add row to subject data frame
-
-#         return dfs_sout, dfs_all
-
-    # if type == 'Face':
-    #     dff1 = pd.read_csv('dtbt_toibilas_face_25s.csv')
-    #     dff2 = pd.read_csv('dtbt_toibilas_face_28s.csv')
-    #     dff3 = pd.read_csv('dtbt_toibilas_face_33s.csv')
-    #     dff = dff1.append(dff2, ignore_index=True)
-    #     dff = dff.append(dff3, ignore_index=True)
-    #     dff[dff < 0] = np.nan  # -1 values to nan
-
-    #     # SUBJECT AND TRIAL INFORMATION
-    #     dff['subject'] = dff.filename.str[:6]  # slicing the subject number from the filename
-    #     dff['experiment'] = dff.filename.str[10:11]  # experiment number
-    #     subjects = np.unique(dff.subject).tolist()  # get unique subjects as list
-    #     subjects.pop(0)
-
-    #     # OUTPUT DATAFRAMES
-    #     dff_sout = pd.DataFrame()  # mean data for each subject
-    #     dff_all = pd.DataFrame()  # all individual values for distribution analysis
-
-    #     # INDIVIDUAL SUBJECT ANALYSIS
-    #     for i, s in enumerate(subjects):
-    #         sdff = pd.DataFrame()  # create new data frame to hold results
-
-    #         # logical indexing (slicing data by stimulus)
-    #         sub = dff[(dff.subject == s)]  # all data of one subject
-    #         ctrl = sub[(sub.condition == 'control.bmp')]  # all control stimuli trials
-    #         ntrl = sub[(sub.condition == 'neutral.bmp')]  # all neutral
-    #         happ = sub[(sub.condition == 'happy.bmp')]  # all happy
-    #         fear = sub[(sub.condition == 'fearful.bmp')]  # all fearful
-
-    #         # list all necessary values for easier looping
-    #         stimus = [sub, ctrl, ntrl, happ, fear]
-    #         filts = ['all', 'ctrl', 'ntrl', 'happ', 'fear']
-    #         pfix_list = ['pfix', 'pfix_c', 'pfix_n', 'pfix_h', 'pfix_f']
-    #         pfix_slist = ['pfix_shift', 'pfix_c_shift', 'pfix_n_shift', 'pfix_h_shift', 'pfix_f_shift']
-    #         obl = ['obl_all', 'obl_c', 'obl_n', 'obl_h',
-    #            'obl_f']  # number of trials where the child didn't shift their gaze ("obligatory looking")
-    #         succ = ['succ_lkm', 'succ_lkm_c', 'succ_lkm_n', 'succ_lkm_h',
-    #             'succ_lkm_f']  # number of technically successful trials
-    #         shown = ['all_shown_lkm', 'c_shown_lkm', 'n_shown_lkm', 'h_shown_lkm', 'f_shown_lkm']
-    #         rts = ['rtime', 'rtime_c', 'rtime_n', 'rtime_h', 'rtime_f']  # reaction times
-
-    #         # add all necessary values to dataframe with one loop
-    #         for i, f in enumerate(stimus):
-    #             sdff[filts[i]] = stimus[i].csaccpindex  # all pfix values, including NaN-values by stimulus type
-    #             sdff[pfix_list[i]] = sdff[filts[i]].dropna().mean()  # mean of non-NaN values by stimulus type
-    #             try:  # may cause errors if not enough values --> try/except
-    #                 sdff[pfix_slist[i]] = sdff[sdff[filts[i]] < 1][
-    #                 filts[i]].mean()  # mean of pfix values that are less than 1 (meaning there was a gaze shift)
-    #             except:
-    #                 sdff[pfix_slist[i]] = np.nan  # if no shifts, put in NaN
-    #             sdff[obl[i]] = sdff[sdff[filts[i]] == 1][filts[i]].count()  # count of trials where there was no gaze shift
-    #             sdff[succ[i]] = stimus[i][stimus[i]['technical_error'] == 0][
-    #             'technical_error'].count()  # count of technically successful trials
-    #             sdff[shown[i]] = stimus[i]['technical_error'].count()
-    #             sdff[rts[i]] = stimus[i][
-    #             stimus[i].combination < 1000].combination  # reaction times that are faster than 1000ms (=no gaze shift)
-
-    #         # percentages of technically successful trials per stimulus
-    #         sdff['all_succp'] = sdff.succ_lkm / sdff.all_shown_lkm
-    #         sdff['c_succp'] = sdff.succ_lkm_c / sdff.c_shown_lkm
-    #         sdff['n_succp'] = sdff.succ_lkm_n / sdff.n_shown_lkm
-    #         sdff['h_succp'] = sdff.succ_lkm_h / sdff.h_shown_lkm
-    #         sdff['f_succp'] = sdff.succ_lkm_f / sdff.f_shown_lkm
-
-    #         sdff['stimulus'] = dff.condition.str[:-4]
-    #         sdff['subject'] = [s] * len(sdff.index)  # subject details
-
-    #         # separate subject csvs for spss analysis (not necessary?)
-    #         filu = "".join([s, "_faceresults.csv"])
-    #         sdff.to_csv(filu, encoding='utf-8')
-
-    #         aout = pd.DataFrame(
-    #             sdff[['subject', 'all', 'stimulus', 'ctrl', 'ntrl', 'happ', 'fear']])  # select only the individual values
-    #         dff_all = dff_all.append(aout, ignore_index=True)  # append the
-    #         sdff.drop(['all', 'ctrl', 'ntrl', 'happ', 'fear', 'stimulus'], axis=1, inplace=True,
-    #               errors='ignore')  # drop individual trial information
-    #         sout = pd.DataFrame(sdff.iloc[0]).T  # select only first row, since all values are the same
-    #         dff_sout = dff_sout.append(sout, ignore_index=True)  # append the full df
-
-    #     return dff_sout, dff_all
-
-
-def getStd(sA, datas):
-    sstd = []
+def getStd(group_trials, datas):
+    subject_std = []
     sub_list = datas.subject.tolist()
     for s in sub_list:
-        sub = sA[sA.subject == s]
-        sstd.append(np.std(sub.srtAll.dropna()))
-    datas['srt_std'] = sstd #count srt std for each participant
+        sub = group_trials[group_trials.subject == s]
+        subject_std.append(np.std(sub.srt.dropna()))
+    datas['srt_std'] = subject_std
+    square_transformed = np.sqrt(datas.srt_std)
 
-    #sns.distplot(datas.srt_std)
-    #plt.title("Subjects' SRT standard deviations")
-    #plt.show()
-    print("Shapiro-Wilk test of normality: " + str(st.shapiro(datas.srt_std)))
+    print("Shapiro-Wilk test of normality for non-transformed data: " + str(st.shapiro(datas.srt_std)))
+    print("Shapiro-Wilk test of normality for square root transformed data: " + str(st.shapiro(square_transformed))
 
-    #sns.distplot(np.sqrt(datas.srt_std))
-    #plt.title("Square-transform of subjects' SRT standard deviations")
-    #plt.show()
-    print("Shapiro-Wilk test of normality: " + str(st.shapiro(np.sqrt(datas.srt_std))))
-
-    sqz = st.zscore(np.sqrt(datas.srt_std))
+    square_zscore = st.zscore(np.sqrt(datas.srt_std))
     datas['sqrt_std'] = np.sqrt(datas.srt_std)
     datas['sqrt_std_z'] = sqz
 
