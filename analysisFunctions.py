@@ -127,7 +127,7 @@ def get_stimuli_lists():
     return stimuli, filters, pfix, success, shown, success_percentage, miss
 
 
-def getStd(group_trials, datas):
+def get_srt_std(group_trials, datas): #rename?
     subject_std = []
     sub_list = datas.subject.tolist()
     for s in sub_list:
@@ -139,39 +139,44 @@ def getStd(group_trials, datas):
     print("Shapiro-Wilk test of normality for non-transformed data: " + str(st.shapiro(datas.srt_std)))
     print("Shapiro-Wilk test of normality for square root transformed data: " + str(st.shapiro(square_transformed))
 
-    square_zscore = st.zscore(np.sqrt(datas.srt_std))
-    datas['sqrt_std'] = np.sqrt(datas.srt_std)
-    datas['sqrt_std_z'] = sqz
+    square_zscore = st.zscore(square_transformed)
+    datas['sqrt_std'] = square_transformed
+    datas['sqrt_std_z'] = square_zscore
+    
+    return datas
+
+# Unfinished but currently not needed
+#def getCI(group_trials, datas):
+    #return "this is unfinished"
+
+def add_basic_differences(datas, difference_list):
+    datas[difference_list[0]] = datas.pfix_control - datas.pfix_neutral
+    datas[difference_list[1]] = datas.pfix_control - datas.pfix_happy
+    datas[difference_list[2]] = datas.pfix_control - datas.pfix_fearful
+    datas[difference_list[3]] = datas.pfix_neutral - datas.pfix_happy
+    datas[difference_list[4]] = datas.pfix_neutral - datas.pfix_fearful
+    datas[difference_list[5]] = datas.pfix_happy - datas.pfix_fearful
+
+    for i in range(6):
+        datas['_'.join(difference_list[i], 'absolute')] = abs(datas.difference_list[i])
+
+    return datas
 
 
-def getCI(sA, datas):
-    return "this is unfinished"
+def add_two_stimulus_means(datas, difference_list):
+    datas['_'.join(difference_list[0], 'mean')] = datas[["pfix_c", "pfix_n"]].mean(axis=1)
+    datas['_'.join(difference_list[1], 'mean')] = datas[["pfix_c", "pfix_h"]].mean(axis=1)
+    datas['_'.join(difference_list[2], 'mean')] = datas[["pfix_c", "pfix_f"]].mean(axis=1)
+    datas['_'.join(difference_list[3], 'mean')] = datas[["pfix_n", "pfix_h"]].mean(axis=1)
+    datas['_'.join(difference_list[4], 'mean')] = datas[["pfix_n", "pfix_f"]].mean(axis=1)
+    datas['_'.join(difference_list[5], 'mean')] = datas[["pfix_h", "pfix_f"]].mean(axis=1)
 
 
-def pfixDeltas(datas):
-    #stimulus pifferences
-    datas['cvsn'] = datas.pfix_c - datas.pfix_n
-    datas['cvsh'] = datas.pfix_c - datas.pfix_h
-    datas['cvsf'] = datas.pfix_c - datas.pfix_f
-    datas['nvsh'] = datas.pfix_n - datas.pfix_h
-    datas['nvsf'] = datas.pfix_n - datas.pfix_f
-    datas['hvsf'] = datas.pfix_h - datas.pfix_f
+def pfix_differences(datas):
+    difference_list = ['control_neutral', 'control_happy', 'control_fearful', 'neutral_happy', 'neutral_fearful', 'happy_fearful']
 
-    #absolute differences
-    datas['cvsna'] = abs(datas.cvsn)
-    datas['cvsha'] = abs(datas.cvsh)
-    datas['cvsfa'] = abs(datas.cvsf)
-    datas['nvsha'] = abs(datas.nvsh)
-    datas['nvsfa'] = abs(datas.nvsf)
-    datas['hvsfa'] = abs(datas.hvsf)
-
-    #stimulus mean for fitting the regression curve
-    datas['cn_avg'] = datas[["pfix_c", "pfix_n"]].mean(axis=1)
-    datas['ch_avg'] = datas[["pfix_c", "pfix_h"]].mean(axis=1)
-    datas['cf_avg'] = datas[["pfix_c", "pfix_f"]].mean(axis=1)
-    datas['nh_avg'] = datas[["pfix_n", "pfix_h"]].mean(axis=1)
-    datas['nf_avg'] = datas[["pfix_n", "pfix_f"]].mean(axis=1)
-    datas['hf_avg'] = datas[["pfix_h", "pfix_f"]].mean(axis=1)
+    datas = add_basic_differences(datas, difference_list)
+    datas = add_two_stimulus_means()
 
     #weighting with success perventage
     datas['comb_c'] = datas.pfix_c * datas.c_succp
