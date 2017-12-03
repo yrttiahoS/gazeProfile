@@ -1,53 +1,24 @@
-from analysisFunctions import *
+from analysisFunctions import plot_style, get_control_data, remove_subjects, worst_performance, pfix_deltas, transform_all, percentile_plots, save_file, print_profiles
 
-plotStyle()
+plot_style()
 
 control_data = get_control_data('controlData')
 
-control_data = removeSubjects(control_data, ['TV33', 'TV59']) # preterms excluded
+control_data = remove_subjects(control_data, ['TV33', 'TV59']) # preterms excluded
 
 #getStd(sA, datas)
 #getCI(sA, datas)
 
-#90. percentile for subject SRTs
-wpr(sA, datas)
+pfix_deltas(control_data)
 
-uudetBest = []
-for i,r in datas.iterrows():
-    p50 = r.SRTmed
-    sub = sA[sA.subject == r.subject]
-    subSRT = [value for value in sub.srtAll if not math.isnan(value)]
-    bestSRT = [value for value in subSRT if value <= p50]
-    uudetBest.append(np.mean(bestSRT))
-datas['best_srt'] = uudetBest
-datas["best_z"] = st.zscore(datas.best_srt)
-print(np.mean(datas.best_srt))
+transform_all(control_data)
+percentile_plots(control_data)
 
-#One way ANOVA for
-fVal, pVal = st.f_oneway(datas.pfix_c, datas.pfix_n, datas.pfix_h, datas.pfix_f)
-print("Pfix ANOVA F: " + str(fVal) + ", p-value: " + str(pVal))
+save_file(control_data, "verrokit.csv")
 
-#Deltas for each stimulus pair
-pfixDeltas(datas)
+print_profiles(control_data)
 
-#Test distribution normality, if normal --> fit quadratic regression curve to delta x the mean of the two pfix means
-transformAll(datas)
-#print("persentiilit")
-#percPlots(datas)
-
-plt.plot([np.mean(datas.pfix_c), np.mean(datas.pfix_n), np.mean(datas.pfix_h), np.mean(datas.pfix_f)], 'bo-')
-plt.plot([np.mean(datas.comb_c), np.mean(datas.comb_n), np.mean(datas.comb_h), np.mean(datas.comb_f)], 'ro-')
-plt.axis([-0.5,3.5,0,1])
-plt.xticks([0,1,2,3], ["Kontrolli", "Neutraali", "Iloinen", "Pelokas"])
-plt.xlabel("Kasvojen ilme")
-plt.ylabel("Katseluosuus")
-plt.show()
-
-#saveFile(datas, "verrokit.csv")
-
-#printAllProfiles(datas)
-
-#TOIBILAS
+#Individual files
 #tSS, tSA = readToibFile(['epi9_2_SRT.csv'], 'SRT') #filenames of preprocessed SRT-data
 #tFS, tFA = readToibFile(['dtbt_toibilas_face_25s.csv', 'dtbt_toibilas_srt_28s.csv', 'dtbt_toibilas_srt_33s.csv'], 'Face')
 

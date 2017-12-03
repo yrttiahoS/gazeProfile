@@ -14,6 +14,7 @@ from os.path import isfile, join
 ids = ['all', 'control', 'neutral', 'happy', 'fearful']
 #id_index_order = [1, 2, 1, 3, 1, 4, 2, 3, 2, 4, 3, 4] # or [1, 1, 1, 2, 2, 3] and [2, 3, 4, 3, 4, 4] --> this will make sense later
 difference_list = ['control_neutral', 'control_happy', 'control_fearful', 'neutral_happy', 'neutral_fearful', 'happy_fearful']
+control_dir = ''
 
 def plot_style():
     plt.style.use(['default', 'seaborn-ticks'])
@@ -24,8 +25,9 @@ def plot_style():
 
 
 def get_control_data(data_dir):
-    control_srt_subjects, control_srt_trials = get_control_data(data_dir, 'SRT')
-    control_face_subjects, control_face_trials = get_control_data(data_dir, 'Face')
+    global control_dir = data_dir #?
+    control_srt_subjects, control_srt_trials = control_analysis('SRT')
+    control_face_subjects, control_face_trials = control_analysis('Face')
 
     control_data = pd.merge(control_srt_subjects, control_face_subjects, on='subject', how="right")
     #control_data_trials = pd.merge(control_srt_trials, control_face_trials, on='subject', how="right") # Currently not needed
@@ -33,20 +35,10 @@ def get_control_data(data_dir):
     return control_data #, control_data_trials
 
 
-def add_all_files(data_dir, subdir):
-    df = pd.DataFrame()
-    filepath = sjoin(dir, subdir)
-    #needs cleanup
-    for file in [f for f in listdir(filepath) if isfile(sjoin(filepath, file))]:
-        df = df.append(pd.read_csv(sjoin(filepath, file)), ignore_index=True)
-    df[df < 0] = np.nan # nan is better than -1
-    return df
+def control_analysis(task_type):
+    data = add_all_files(task_type)
 
-
-def get_control_data(datafolder, task_type):
-    data = add_all_files(datafolder, task_type)
-
-    data['subject'] = df.filename.str.partition("_")[0]
+    data['subject'] = data.filename.str.partition("_")[0]
 
     if task_type == 'SRT':
         group_trials, group_subjects = srt_analysis(data)
@@ -56,12 +48,14 @@ def get_control_data(datafolder, task_type):
     return group_subjects, group_trials
 
 
-def analysis_files(df):
-    group_trials = pd.DataFrame()
-    group_subjects = pd.DataFrame()
-    subject_list = np.unique(df.subject)
-
-    return group_trials, group_subjects, subject_list
+def add_all_files(task_type):
+    data = pd.DataFrame()
+    path = sjoin(control_dir, task_type)
+    #needs cleanup
+    for file in [f for f in listdir(path) if isfile(sjoin(path, file))]:
+        data = data.append(pd.read_csv(sjoin(path, file)), ignore_index=True)
+    data[data < 0] = np.nan # nan is better than -1
+    return data
 
 
 def srt_analysis(df):
@@ -87,6 +81,14 @@ def srt_analysis(df):
     group_subjects['srt_zscore'] = st.zscore(group_subjects.srt_med)
 
     return group_trials, group_subjects
+
+
+def analysis_files(df):
+    group_trials = pd.DataFrame()
+    group_subjects = pd.DataFrame()
+    subject_list = np.unique(df.subject)
+
+    return group_trials, group_subjects, subject_list
 
 
 def face_analysis(df):
@@ -230,7 +232,7 @@ def worst_performance(sA, datas):
     datas['wp90z'] = st.zscore(sub_wpr)
 
 
-def dataTransform(datas, diff):
+def data_transform(datas, diff):
     if diff == "cvsna":
         ka = datas.cn_avg
         seli = "Control vs Neutral"
@@ -354,7 +356,7 @@ def curvefitting(datas, ka, seli, diff):
     #add desc statistics
 
 
-def sqrtTrans(datas, diff):
+def sqrt_trans(datas, diff):
     uusi = np.sqrt(datas[diff].tolist())
     print("Normality after transform: " + str(st.shapiro(uusi)))
     datas[ujoin(diff, "sqrt")] = uusi
@@ -372,7 +374,7 @@ def percentiles(datas, diff):
     return nolla, eka, toka, kolmas, neljas, viides
 
 
-def percPlots(datas):
+def perc_plots(datas):
     diffs = ["nvsha", "nvsfa", "hvsfa"]
     for i,r in datas.iterrows():
         for d in diffs:
@@ -391,18 +393,18 @@ def percPlots(datas):
             plt.show()
 
 
-def transformAll(datas):
+def transform_all(datas):
     differences = ["cvsna","cvsha","cvsfa","nvsha","nvsfa","hvsfa","cvsnac","cvshac","cvsfac","nvshac","nvsfac","hvsfac"]
     for d in differences:
         arvot = dataTransform(datas, d)
         datas[ujoin(d, "fin_z")] = st.zscore(arvot)
 
 
-def saveFile(df, filename):
+def save_file(df, filename):
     df.to_csv(filename, encoding='utf-8')
 
 
-def printAllProfiles(datas):
+def print_profiles(datas):
     for i, r in datas.iterrows():
         fig = plt.figure()
         ax = fig.add_subplot(111)
@@ -469,7 +471,7 @@ def printAllProfiles(datas):
         plt.show()
 
 
-def removeSubjects(datas, subjectList):
+def remove_subjects(datas, subjectList):
     for s in subjectList:
         datas = datas[datas.subject != s]
 
@@ -490,3 +492,15 @@ def ujoin(string1, string2):
 
 def sjoin(string1, string2):
     return '/'.join(string1, string2)
+
+#def best_times():
+#uudetBest = []
+#for i,r in datas.iterrows():
+#    p50 = r.SRTmed
+#    sub = sA[sA.subject == r.subject]
+#    subSRT = [value for value in sub.srtAll if not math.isnan(value)]
+#    bestSRT = [value for value in subSRT if value <= p50]
+#    uudetBest.append(np.mean(bestSRT))
+#datas['best_srt'] = uudetBest
+#datas["best_z"] = st.zscore(datas.best_srt)
+#print(np.mean(datas.best_srt))
