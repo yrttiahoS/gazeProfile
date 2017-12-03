@@ -14,18 +14,19 @@ from os.path import isfile, join
 ids = ['all', 'control', 'neutral', 'happy', 'fearful']
 #id_index_order = [1, 2, 1, 3, 1, 4, 2, 3, 2, 4, 3, 4] # or [1, 1, 1, 2, 2, 3] and [2, 3, 4, 3, 4, 4] --> this will make sense later
 difference_list = ['control_neutral', 'control_happy', 'control_fearful', 'neutral_happy', 'neutral_fearful', 'happy_fearful']
-control_dir = ''
+control_directory = ''
 
 def plot_style():
     plt.style.use(['default', 'seaborn-ticks'])
-    fig_size = plt.rcParams["figure.figsize"]
-    fig_size[0] = 7
-    fig_size[1] = 5
-    plt.rcParams["figure.figsize"] = fig_size
+    figure_size = plt.rcParams["figure.figsize"]
+    figure_size[0] = 7
+    figure_size[1] = 5
+    plt.rcParams["figure.figsize"] = figure_size
 
 
-def get_control_data(data_dir):
-    global control_dir = data_dir #?
+def get_control_data(data_directory):
+    global control_directory
+    control_directory = data_directory
     control_srt_subjects, control_srt_trials = control_analysis('SRT')
     control_face_subjects, control_face_trials = control_analysis('Face')
 
@@ -50,7 +51,7 @@ def control_analysis(task_type):
 
 def add_all_files(task_type):
     data = pd.DataFrame()
-    path = sjoin(control_dir, task_type)
+    path = sjoin(control_directory, task_type)
     #needs cleanup
     for file in [f for f in listdir(path) if isfile(sjoin(path, file))]:
         data = data.append(pd.read_csv(sjoin(path, file)), ignore_index=True)
@@ -110,13 +111,13 @@ def face_analysis(df):
             subject_data[success_list[i]] = stimuli[i][stimuli[i]['technical error'] == 0]['technical error'].count()
             subject_data[shown_list[i]] = stimuli[i]['technical error'].count()
             subject_data[success_percentage_list[i]] = subject_data[success_list[i]] / subject_data[shown_list[i]]
-            subject_data[miss_list[i]] = subject_data[shown_list[i]] / sdf[success_list[i]]
+            subject_data[miss_list[i]] = subject_data[shown_list[i]] / subject_data[success_list[i]]
 
         group_trials = group_trials.append(subject_data.loc[:,['subject', 'stimulus', 'trial_all', 'trial_control', 'trial_neutral', 'trial_happy', 'trial_fearful']], ignore_index=True)
         subject_data.drop(['stimulus', 'trial_all', 'trial_control', 'trial_neutral', 'trial_happy', 'trial_fearful'], axis=1, inplace=True, errors='ignore') # this is a bit copy-paste-y, please fix
         group_subjects = group_subjects.append(subject_data.head(1), ignore_index=True)
 
-    return group_subject_out, group_all_out
+    return group_trials, group_subjects
 
 
 def get_stimuli_lists():
@@ -130,178 +131,178 @@ def get_stimuli_lists():
         success_percentage.append(ujoin('success_percentage', i))
         miss.append(ujoin('miss', i))
 
-    return stimuli, filters, pfix, success, shown, success_percentage, miss
+    return filters, pfix, success, shown, success_percentage, miss
 
 
-def get_srt_std(group_trials, datas): #rename?
+def get_srt_std(group_trials, data): #rename?
     subject_std = []
-    sub_list = datas.subject.tolist()
+    sub_list = data.subject.tolist()
     for s in sub_list:
         sub = group_trials[group_trials.subject == s]
         subject_std.append(np.std(sub.srt.dropna()))
-    datas['srt_std'] = subject_std
-    square_transformed = np.sqrt(datas.srt_std)
-
-    print("Shapiro-Wilk test of normality for non-transformed data: " + str(st.shapiro(datas.srt_std)))
-    print("Shapiro-Wilk test of normality for square root transformed data: " + str(st.shapiro(square_transformed))
-
+    data['srt_std'] = subject_std
+    square_transformed = np.sqrt(data.srt_std)
     square_zscore = st.zscore(square_transformed)
-    datas['sqrt_std'] = square_transformed
-    datas['sqrt_std_z'] = square_zscore
-    
-    return datas
+    data['square_srt_std'] = square_transformed
+    data['square_srt_std_zscore'] = square_zscore
 
+    print("Shapiro-Wilk test of normality for non-transformed data: " + str(st.shapiro(data.srt_std)))
+    print("Shapiro-Wilk test of normality for square root transformed data: " + str(st.shapiro(square_transformed)))
+
+    return data
 
 # Unfinished but currently not needed
-#def getCI(group_trials, datas):
+#def getCI(group_trials, data):
     #return "this is unfinished"
 
 
-def add_differences(datas):
+def add_differences(data):
     # needs cleanup
-    datas[difference_list[0]] = datas.pfix_control - datas.pfix_neutral
-    datas[difference_list[1]] = datas.pfix_control - datas.pfix_happy
-    datas[difference_list[2]] = datas.pfix_control - datas.pfix_fearful
-    datas[difference_list[3]] = datas.pfix_neutral - datas.pfix_happy
-    datas[difference_list[4]] = datas.pfix_neutral - datas.pfix_fearful
-    datas[difference_list[5]] = datas.pfix_happy - datas.pfix_fearful
+    data[difference_list[0]] = data.pfix_control - data.pfix_neutral
+    data[difference_list[1]] = data.pfix_control - data.pfix_happy
+    data[difference_list[2]] = data.pfix_control - data.pfix_fearful
+    data[difference_list[3]] = data.pfix_neutral - data.pfix_happy
+    data[difference_list[4]] = data.pfix_neutral - data.pfix_fearful
+    data[difference_list[5]] = data.pfix_happy - data.pfix_fearful
 
     for i in range(6):
-        datas[ujoin(difference_list[i], 'absolute')] = abs(datas.difference_list[i])
+        data[ujoin(difference_list[i], 'absolute')] = abs(data.difference_list[i])
     
     #difference of weighted values --> needs cleanup (like above, combine these into one)
-    datas['cvsnc'] = datas.comb_c - datas.comb_n
-    datas['cvshc'] = datas.comb_c - datas.comb_h
-    datas['cvsfc'] = datas.comb_c - datas.comb_f
-    datas['nvshc'] = datas.comb_n - datas.comb_h
-    datas['nvsfc'] = datas.comb_n - datas.comb_f
-    datas['hvsfc'] = datas.comb_h - datas.comb_f
+    data['cvsnc'] = data.comb_c - data.comb_n
+    data['cvshc'] = data.comb_c - data.comb_h
+    data['cvsfc'] = data.comb_c - data.comb_f
+    data['nvshc'] = data.comb_n - data.comb_h
+    data['nvsfc'] = data.comb_n - data.comb_f
+    data['hvsfc'] = data.comb_h - data.comb_f
 
     #absolute weighted differences --> needs cleanup
-    datas['cvsnac'] = abs(datas.cvsnc)
-    datas['cvshac'] = abs(datas.cvshc)
-    datas['cvsfac'] = abs(datas.cvsfc)
-    datas['nvshac'] = abs(datas.nvshc)
-    datas['nvsfac'] = abs(datas.nvsfc)
-    datas['hvsfac'] = abs(datas.hvsfc)
+    data['cvsnac'] = abs(data.cvsnc)
+    data['cvshac'] = abs(data.cvshc)
+    data['cvsfac'] = abs(data.cvsfc)
+    data['nvshac'] = abs(data.nvshc)
+    data['nvsfac'] = abs(data.nvsfc)
+    data['hvsfac'] = abs(data.hvsfc)
 
-    return datas
+    return data
 
 
-def add_two_stimulus_means(datas):
+def add_two_stimulus_means(data):
     # needs cleanup
-    datas[ujoin(difference_list[0], 'mean')] = datas[["pfix_control", "pfix_neutral"]].mean(axis=1)
-    datas[ujoin(difference_list[1], 'mean')] = datas[["pfix_control", "pfix_happy"]].mean(axis=1)
-    datas[ujoin(difference_list[2], 'mean')] = datas[["pfix_control", "pfix_fearful"]].mean(axis=1)
-    datas[ujoin(difference_list[3], 'mean')] = datas[["pfix_neutral", "pfix_happy"]].mean(axis=1)
-    datas[ujoin(difference_list[4], 'mean')] = datas[["pfix_neutral", "pfix_fearful"]].mean(axis=1)
-    datas[ujoin(difference_list[5], 'mean')] = datas[["pfix_happy", "pfix_fearful"]].mean(axis=1)
+    data[ujoin(difference_list[0], 'mean')] = data[["pfix_control", "pfix_neutral"]].mean(axis=1)
+    data[ujoin(difference_list[1], 'mean')] = data[["pfix_control", "pfix_happy"]].mean(axis=1)
+    data[ujoin(difference_list[2], 'mean')] = data[["pfix_control", "pfix_fearful"]].mean(axis=1)
+    data[ujoin(difference_list[3], 'mean')] = data[["pfix_neutral", "pfix_happy"]].mean(axis=1)
+    data[ujoin(difference_list[4], 'mean')] = data[["pfix_neutral", "pfix_fearful"]].mean(axis=1)
+    data[ujoin(difference_list[5], 'mean')] = data[["pfix_happy", "pfix_fearful"]].mean(axis=1)
 
-    datas['cnc_avg'] = datas[["weighted_control", "weighted_neutral"]].mean(axis=1)
-    datas['chc_avg'] = datas[["weighted_control", "weighted_happy"]].mean(axis=1)
-    datas['cfc_avg'] = datas[["weighted_control", "weighted_fearful"]].mean(axis=1)
-    datas['nhc_avg'] = datas[["weighted_neutral", "weighted_happy"]].mean(axis=1)
-    datas['nfc_avg'] = datas[["weighted_neutral", "weighted_fearful"]].mean(axis=1)
-    datas['hfc_avg'] = datas[["weighted_happy", "weighted_fearful"]].mean(axis=1)
+    data['cnc_avg'] = data[["weighted_control", "weighted_neutral"]].mean(axis=1)
+    data['chc_avg'] = data[["weighted_control", "weighted_happy"]].mean(axis=1)
+    data['cfc_avg'] = data[["weighted_control", "weighted_fearful"]].mean(axis=1)
+    data['nhc_avg'] = data[["weighted_neutral", "weighted_happy"]].mean(axis=1)
+    data['nfc_avg'] = data[["weighted_neutral", "weighted_fearful"]].mean(axis=1)
+    data['hfc_avg'] = data[["weighted_happy", "weighted_fearful"]].mean(axis=1)
 
-    return datas
+    return data
 
 
-def weight_with_success_percentage(datas):
+def weight_with_success_percentage(data):
     for i in range(1,5):
-        datas[ujoin('weighted', ids[i])] = datas[ujoin('pfix', ids[i]) * datas[ujoin('success_percentage', ids[i])]
-    return datas
+        data[ujoin('weighted', ids[i])] = data[ujoin('pfix', ids[i]) * data[ujoin('success_percentage', ids[i])]]
+    return data
 
 
-def pfix_differences(datas):
-    datas = weight_with_success_percentage(datas)
-    datas = add_differences(datas)
-    datas = add_two_stimulus_means(datas)
-    return datas
+def pfix_differences(data):
+    data = weight_with_success_percentage(data)
+    data = add_differences(data)
+    data = add_two_stimulus_means(data)
+    return data
 
 
-def worst_performance(sA, datas):
-    subjest_list = datas.subject.tolist()
+def worst_performance(group_trials, data):
+    subject_list = data.subject.tolist()
     subject_worst_performance = []
 
-    for i,s in enumerate(sub_list):
-        sub = sA[sA.subject == sub_list[i]]
+    for i,s in enumerate(subject_list):
+        sub = group_trials[group_trials.subject == subject_list[i]]
         subject_worst_performance.append(np.percentile(np.sort(sub.srt.dropna().tolist()), 90))
 
-    datas['wp90'] = subject_worst_performance
-    datas['wp90z'] = st.zscore(sub_wpr)
+    data['subject_worst_performace'] = subject_worst_performance
+    data['subject_worst_performace_zscore'] = st.zscore(subject_worst_performance)
+
+    return data
 
 
-def data_transform(datas, diff):
-    if diff == "cvsna":
-        ka = datas.cn_avg
-        seli = "Control vs Neutral"
-    elif diff == "cvsha":
-        ka = datas.ch_avg
-        seli = "Control vs Happy"
-    elif diff == "cvsfa":
-        ka = datas.cf_avg
-        seli = "Control vs Fearful"
-    elif diff == "nvsha":
-        ka = datas.nh_avg
-        seli = "Neutral vs Happy"
-    elif diff == "nvsfa":
-        ka = datas.nf_avg
-        seli = "Neutral vs Fearful"
-    elif diff == "hvsfa":
-        ka = datas.hf_avg
-        seli = "Neutral vs Happy"
-    elif diff == "cvsnac":
-        ka = datas.cnc_avg
-        seli = "Weighted Control vs Neutral"
-    elif diff == "cvshac":
-        ka = datas.chc_avg
-        seli = "Weighted Control vs Happy"
-    elif diff == "cvsfac":
-        ka = datas.cfc_avg
-        seli = "Weighted Control vs Fearful"
-    elif diff == "nvshac":
-        ka = datas.nhc_avg
-        seli = "Weighted Neutral vs Happy"
-    elif diff == "nvsfac":
-        ka = datas.nfc_avg
-        seli = "Weighted Neutral vs Fearful"
-    elif diff == "hvsfac":
-        ka = datas.hfc_avg
-        seli = "Weighted Happy vs Fearful"
+def data_transform(data, difference):
+    # CLEAN UP NEEDED, this is terrible
+    if difference == "cvsna":
+        diff_label = data.cn_avg
+        stimuli_mean = "Control vs Neutral"
+    elif difference == "cvsha":
+        stimuli_mean = data.ch_avg
+        diff_label = "Control vs Happy"
+    elif difference == "cvsfa":
+        stimuli_mean = data.cf_avg
+        diff_label = "Control vs Fearful"
+    elif difference == "nvsha":
+        stimuli_mean = data.nh_avg
+        diff_label = "Neutral vs Happy"
+    elif difference == "nvsfa":
+        stimuli_mean = data.nf_avg
+        diff_label = "Neutral vs Fearful"
+    elif difference == "hvsfa":
+        stimuli_mean = data.hf_avg
+        diff_label = "Neutral vs Happy"
+    elif difference == "cvsnac":
+        stimuli_mean = data.cnc_avg
+        diff_label = "Weighted Control vs Neutral"
+    elif difference == "cvshac":
+        stimuli_mean = data.chc_avg
+        diff_label = "Weighted Control vs Happy"
+    elif difference == "cvsfac":
+        stimuli_mean = data.cfc_avg
+        diff_label = "Weighted Control vs Fearful"
+    elif difference == "nvshac":
+        stimuli_mean = data.nhc_avg
+        diff_label = "Weighted Neutral vs Happy"
+    elif difference == "nvsfac":
+        stimuli_mean = data.nfc_avg
+        diff_label = "Weighted Neutral vs Fearful"
+    elif difference == "hvsfac":
+        stimuli_mean = data.hfc_avg
+        diff_label = "Weighted Happy vs Fearful"
 
-    w, p = st.shapiro(datas[diff])
-    #sns.distplot(datas[diff])
-    #plt.show()
+    w_stat, p_value = st.shapiro(data[difference])
 
-    print(seli + " Shapiro-Wilk test of normality, W: " + str(w) + ", p-value: " + str(p))
-    if p < 0.05:
+    print(diff_label + " Shapiro-Wilk test of normality, W: " + str(w_stat) + ", p-value: " + str(p_value))
+    if p_value < 0.05:
         print("The distribution is non-normal, proceeding to square root transform")
-        tulos = sqrtTrans(datas, diff)
+        transformed_result = square_transform(data, difference)
     else:
         print("The distribution is (approx.) normal, proceeding to curvefitting")
-        tulos = curvefitting(datas, ka, seli, diff)
+        transformed_result = curvefitting(data, stimuli_mean, diff_label, difference)
 
-    return tulos
+    return transformed_result
 
 
-def curvefitting(datas, ka, seli, diff):
+def curvefitting(data, stimuli_mean, diff_label, difference):
+    # clean up if possible --> probably not necessary?
     x = []
     y = []
     points = []
-    idx = datas.index.tolist()
+    idx = data.index.tolist()
 
     # get avg of control and neutral trials and their difference per subject
     for i in idx:
         lst = []
-        lst.append(ka[i])
-        lst.append(datas[diff][i])
-        lst.append(datas.subject[i])
+        lst.append(stimuli_mean[i])
+        lst.append(data[difference][i])
+        lst.append(data.subject[i])
         points.append(lst)
     points.sort(key=lambda x: x[0])
-    jarjestys = []
+    orig_order = []
     for lst in points:
-        jarjestys.append(lst[2])
+        orig_order.append(lst[2])
 
     # fit regression curve
     for i in range(len(points)):
@@ -309,14 +310,14 @@ def curvefitting(datas, ka, seli, diff):
         y.append(points[i][1])
     fit, res, _, _, _ = np.polyfit(x, y, 2, full=True)
     fit_fn = np.poly1d(fit)  # regression formula
-    print(seli)
+    print(diff_label)
     print(fit_fn)
 
     #plot
     #plt.plot(x, y, 'yo', x, fit_fn(x), 'k--')
-    #plt.title(seli + " " + str(fit_fn))
-    #plt.xlabel("Mean " + seli)
-    #plt.ylabel("Abs. difference " + seli)
+    #plt.title(diff_label + " " + str(fit_fn))
+    #plt.xlabel("Mean " + diff_label)
+    #plt.ylabel("Abs. difference " + diff_label)
     #plt.savefig(ujoin(stimuli, "reg.png"))
     #plt.show()
 
@@ -332,54 +333,55 @@ def curvefitting(datas, ka, seli, diff):
     #plt.plot(x, result.best_fit, 'r-')
     #plt.show()
 
-    tasotus = y - result.init_fit
+    #?
+    new_even = y - result.init_fit
 
-    #plt.plot(tasotus, 'bo')
-    #plt.title(seli + " residuals")
+    #plt.plot(new_even, 'bo')
+    #plt.title(diff_label + " residuals")
     #plt.plot([0, 38], [0, 0], 'k--', lw=1)
     #plt.savefig(ujoin(stimuli, "res.png"))
     #plt.show()
 
-    uusijarjestys = []
-    for i, v in enumerate(tasotus):
-        plorp = []
-        plorp.append(v)
-        plorp.append(jarjestys[i])
-        uusijarjestys.append(plorp)
-    uusijarjestys.sort(key=lambda x: x[1])
+    new_order = []
+    for i, v in enumerate(new_even):
+        help_list = []
+        help_list.append(v)
+        help_list.append(orig_order[i])
+        new_order.append(help_list)
+    new_order.sort(key=lambda x: x[1])
 
-    uudet = [item[0] for item in uusijarjestys]
-    datas[ujoin(diff, "resid")] = uudet
+    new_resids = [item[0] for item in new_order]
+    data[ujoin(difference, "resid")] = new_resids
     print(result.fit_report(min_correl=0.25))
 
-    return uudet
+    return new_resids
     #add desc statistics
 
 
-def sqrt_trans(datas, diff):
-    uusi = np.sqrt(datas[diff].tolist())
-    print("Normality after transform: " + str(st.shapiro(uusi)))
-    datas[ujoin(diff, "sqrt")] = uusi
-    return uusi
+def square_transform(data, difference):
+    transformed = np.sqrt(data[difference].tolist())
+    print("Normality after transform: " + str(st.shapiro(transformed)))
+    data[ujoin(difference, "sqrt")] = transformed
+    return transformed
 
 
-def percentiles(datas, diff):
-    nolla = np.percentile(datas[diff], 2.5)
-    eka = np.percentile(datas[diff], 16)
-    toka = np.percentile(datas[diff], 50)
-    kolmas = np.percentile(datas[diff], 84)
-    neljas = np.percentile(datas[diff], 97.5)
-    viides = np.percentile(datas[diff], 100)
+def percentiles(data, difference):
+    zeroth_percentile = np.percentile(data[difference], 2.5)
+    first_percentile = np.percentile(data[difference], 16)
+    second_percentile = np.percentile(data[difference], 50)
+    third_percentile = np.percentile(data[difference], 84)
+    fourth_percentile = np.percentile(data[difference], 97.5)
+    fifth_percentile = np.percentile(data[difference], 100)
 
-    return nolla, eka, toka, kolmas, neljas, viides
+    return [zeroth_percentile, first_percentile, second_percentile, third_percentile, fourth_percentile, fifth_percentile]
 
 
-def perc_plots(datas):
-    diffs = ["nvsha", "nvsfa", "hvsfa"]
-    for i,r in datas.iterrows():
-        for d in diffs:
-            perc = percentiles(datas, d)
-            print(perc)
+def percentile_plots(data):
+    differences = ["nvsha", "nvsfa", "hvsfa"]
+    for i,r in data.iterrows():
+        for d in differences:
+            percentiles = percentiles(data, d)
+            print(percentiles)
             x = range(1)
             plt.plot(r[d],x, "o")
             plt.title(r.subject + d)
@@ -393,19 +395,19 @@ def perc_plots(datas):
             plt.show()
 
 
-def transform_all(datas):
+def transform_all(data):
     differences = ["cvsna","cvsha","cvsfa","nvsha","nvsfa","hvsfa","cvsnac","cvshac","cvsfac","nvshac","nvsfac","hvsfac"]
     for d in differences:
-        arvot = dataTransform(datas, d)
-        datas[ujoin(d, "fin_z")] = st.zscore(arvot)
+        arvot = dataTransform(data, d)
+        data[ujoin(d, "fin_z")] = st.zscore(arvot)
 
 
-def save_file(df, filename):
-    df.to_csv(filename, encoding='utf-8')
+def save_file(data, filename):
+    data.to_csv(filename, encoding='utf-8')
 
 
-def print_profiles(datas):
-    for i, r in datas.iterrows():
+def print_profiles(data):
+    for i, r in data.iterrows():
         fig = plt.figure()
         ax = fig.add_subplot(111)
         ax.plot([r.pfix_c, r.pfix_n, r.pfix_h, r.pfix_f], 'o-')
@@ -438,7 +440,7 @@ def print_profiles(datas):
         plt.ylabel("Difference", fontsize=10)
         for label in ax.get_yticklabels():
             label.set_fontsize(10)
-        plt.savefig(ujoin((r.subject, "diff.png")))
+        plt.savefig(ujoin((r.subject, "difference.png")))
         plt.legend()
         plt.show()
 
@@ -465,17 +467,16 @@ def print_profiles(datas):
         plt.ylabel("Index")
         plt.xlabel("z-score")
         plt.title(r.subject + " eye tracking profile")
-        #plt.legend()
         plt.yticks(range(11), ['H vs F', "EMOTION", "N vs F", "N vs H", "FACE", "C vs F", "C vs H", "C vs N", "SRT 90p", "SRT best", "SRT med"])
         plt.savefig(ujoin(r.subject, "profile.png"))
         plt.show()
 
 
-def remove_subjects(datas, subjectList):
-    for s in subjectList:
-        datas = datas[datas.subject != s]
+def remove_subjects(data, subject_list):
+    for s in subject_list:
+        data = data[data.subject != s]
 
-    return datas
+    return data
 
 
 def get_stimulustypes(sub):
@@ -495,12 +496,12 @@ def sjoin(string1, string2):
 
 #def best_times():
 #uudetBest = []
-#for i,r in datas.iterrows():
+#for i,r in data.iterrows():
 #    p50 = r.SRTmed
 #    sub = sA[sA.subject == r.subject]
 #    subSRT = [value for value in sub.srtAll if not math.isnan(value)]
 #    bestSRT = [value for value in subSRT if value <= p50]
 #    uudetBest.append(np.mean(bestSRT))
-#datas['best_srt'] = uudetBest
-#datas["best_z"] = st.zscore(datas.best_srt)
-#print(np.mean(datas.best_srt))
+#data['best_srt'] = uudetBest
+#data["best_z"] = st.zscore(data.best_srt)
+#print(np.mean(data.best_srt))
