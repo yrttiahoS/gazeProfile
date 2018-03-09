@@ -8,6 +8,6 @@ Preprocessing was done with Infant Cognition Lab's (University of Tampere) [gaze
 
 ## Notice
 This project is still in development, final version should be out early 2018.
+Santeri Yrttiaho (santeri.yrttiaho@uta.fi) has started to test and update this code since 8.3.2018.
 
-### Comments
-The files are at points VERY overly commented, which is bad coding practice on my part. This commenting style is due to learning from experience that (especially in research) even very thorough external documentation may mysteriously disappear along the way during development. Most comments will be gone very soon.
+
