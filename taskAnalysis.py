@@ -1,4 +1,9 @@
-from analysisFunctions import plot_style, get_control_data, remove_subjects, worst_performance, pfix_deltas, transform_all, percentile_plots, save_file, print_profiles
+import analysisFunctions as af
+for i in dir(af): print( i )
+
+
+from analysisFunctions import plot_style, get_control_data, remove_subjects, transform_all, percentile_plots, save_file, print_profiles
+#worst_performance,pfix_deltas
 
 plot_style()
 
@@ -9,7 +14,7 @@ control_data = remove_subjects(control_data, ['TV33', 'TV59']) # preterms exclud
 #getStd(sA, datas)
 #getCI(sA, datas)
 
-pfix_deltas(control_data)
+#pfix_deltas(control_data)
 
 transform_all(control_data)
 percentile_plots(control_data)

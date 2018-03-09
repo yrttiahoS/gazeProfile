@@ -24,7 +24,9 @@ def plot_style():
     plt.rcParams["figure.figsize"] = figure_size
 
 
+
 def get_control_data(data_directory):
+    
     global control_directory
     control_directory = data_directory
     control_srt_subjects, control_srt_trials = control_analysis('SRT')
@@ -37,8 +39,14 @@ def get_control_data(data_directory):
 
 
 def control_analysis(task_type):
+    """Does analysis depending on task_type.
+        Input argument:
+            task_type -- 'SRT' or 'Face'
+        Output:
+            group_subjects, group_trial
+    """
+    
     data = add_all_files(task_type)
-
     data['subject'] = data.filename.str.partition("_")[0]
 
     if task_type == 'SRT':
@@ -50,27 +58,45 @@ def control_analysis(task_type):
 
 
 def add_all_files(task_type):
+    """Appends tbt data from csvfiles into a heterog. data
+        Input argument:
+            task_type -- must match subfolder name 
+                within data directory SRT/Face
+        Output argument:
+            data from all files
+    """
     data = pd.DataFrame()
     path = sjoin(control_directory, task_type)
     #needs cleanup
-    for file in [f for f in listdir(path) if isfile(sjoin(path, file))]:
-        data = data.append(pd.read_csv(sjoin(path, file)), ignore_index=True)
-    data[data < 0] = np.nan # nan is better than -1
+    for f in listdir(path):
+        if isfile(sjoin(path, f)):
+            data = data.append(pd.read_csv(sjoin(path, f)), ignore_index=True)
+                    
+    #for file in [f for f in listdir(path) if isfile(sjoin(path, file))]:
+     #   data = data.append(pd.read_csv(sjoin(path, file)), ignore_index=True)
+    data[data == -1] = np.nan # nan is better than -1
+    #Santeri 8.3.2018: previously data[data < 0], but this destroyed filenames!
     return data
 
 
 def srt_analysis(df):
+    """Extracts median SRT 
+    and number of missing trials(?) from each participant.
+    Calculates participant-specific zscores of SRT.
+    
+    """
     group_trials, group_subjects, subject_list = analysis_files(df)
 
     for index, subject in enumerate(subject_list):
         subject_data = pd.DataFrame()
         sub = df[(df.subject == subject)]
 
-        subject_data['subject'] = [subject] * len(subject_data.index)
-        subject_data['trial'] = sub.trialnumber ## CHECK IF CORRECT
+        #Santeri 8.3.2018: sub.trialnumber IS NOT CORRECT! it's trialnum
+        subject_data['trial'] = sub.trialnum#ber ## CHECK IF CORRECT
         subject_data['srt'] = sub.combination
         subject_data[subject_data.srt == 1000] = np.nan # reaction times of 1000 ms are not valid (no gaze shift) --> remove
-
+        subject_data['subject'] = [subject] * len(subject_data.index)
+        
         group_trials = group_trials.append(subject_data, ignore_index=True)
 
         subject_data['missing'] = subject_data.srt.isnull().sum()
@@ -79,7 +105,8 @@ def srt_analysis(df):
         subject_data.drop(['srt', 'trial'], axis=1, inplace=True, errors='ignore')
         group_subjects = group_subjects.append(subject_data.head(1), ignore_index=True)
 
-    group_subjects['srt_zscore'] = st.zscore(group_subjects.srt_med)
+    #Calculate the z score of each value in the sample, relative to the sample mean and standard deviation.
+    group_subjects['srt_zscore'] = st.zscore(group_subjects.srt_median)
 
     return group_trials, group_subjects
 
@@ -409,7 +436,7 @@ def save_file(data, filename):
 def print_profiles(data):
     for i, r in data.iterrows():
         fig = plt.figure()
-        ax = fig.add_subplot(111)
+        ax = fig.___subplot(111)
         ax.plot([r.pfix_c, r.pfix_n, r.pfix_h, r.pfix_f], 'o-')
         plt.plot([-1, 7], [r.pfix, r.pfix], 'k--', lw=1, label="mean " + str(round(r.pfix, 2)))
         plt.title(r.subject + " pfix", fontsize=14)
@@ -489,10 +516,10 @@ def get_stimulustypes(sub):
 
 
 def ujoin(string1, string2):
-    return '_'.join(string1, string2)
+    return '_'.join([string1, string2])
 
 def sjoin(string1, string2):
-    return '/'.join(string1, string2)
+    return '/'.join([string1, string2])
 
 #def best_times():
 #uudetBest = []
